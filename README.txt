@@ -12,7 +12,7 @@ The library is available in 5 languages:
 * Java
 * Javascript
 * PHP
-* Python
+* Python (not yet available - scheduled October 2014)
 
 The libraries for each language are functionally identical, and use as similar
 calling conventions as possible, given the constraints imposed by each language. 
