@@ -1,12 +1,12 @@
-CoinSpark library 1.0 README - coinspark.org
+CoinSpark libraries 1.0 README - coinspark.org
 
 
 ABOUT
 -----
-The CoinSpark library helps you integrate support for the CoinSpark protocol into
+The CoinSpark libraries help you integrate support for the CoinSpark protocol into
 your wallet, or any other tool or service.
 
-The library is available in 5 languages:
+The libraries are available in 5 languages:
 
 * C/C++
 * Java
@@ -22,7 +22,7 @@ For more information and code examples: http://coinspark.org/developers/
 
 HOW TO TEST
 -----------
-The library includes extensive tests to verify that it behaves identically for
+The libraries include extensive tests to verify that it behaves identically for
 all inputs, for all languages. We encourage you to run these tests for yourself
 by following the steps below. Explicit command line instructions are provided
 for Unix-based systems.
