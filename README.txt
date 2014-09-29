@@ -22,9 +22,10 @@ For more information and code examples: http://coinspark.org/developers/
 
 HOW TO TEST
 -----------
-The library includes extensive tests to verify that it behaves identically for all inputs,
-for all languages. We encourage you to run these tests for yourself by following the steps
-below. Explicit command line instructions are provided for Unix-based systems.
+The library includes extensive tests to verify that it behaves identically for
+all inputs, for all languages. We encourage you to run these tests for yourself
+by following the steps below. Explicit command line instructions are provided
+for Unix-based systems.
 
 * Download all the library files to your computer.
 
