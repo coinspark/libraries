@@ -91,7 +91,7 @@ diff Transfer-Output-C.txt Transfer-Output-Python.txt
 
 * Java tests begin by compiling the Java classes:
 
-javac  ../java/org/coinspark/protocol/*.java
+javac ../java/org/coinspark/protocol/*.java
 
 * Now run the CoinSparkTest class and keep pressing return to accept all the default options:
 
