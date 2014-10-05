@@ -382,7 +382,7 @@ void RandomizeTransfer(CoinSparkTransfer* transfer, const CoinSparkTransfer* pre
 {
     CoinSparkTransferClear(transfer);
     
-    if (TRUE/*(rand()%8)==0*/) // make it a default route
+    if ((rand()%8)==0) // make it a default route
         transfer->assetRef.blockNum=COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE;
     else if (previousTransfer && (rand()&1) ) // use same as previous
         transfer->assetRef=previousTransfer->assetRef;

@@ -1192,7 +1192,7 @@
 		{
 			if ($this->assetRef->blockNum==COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE)
 				return ($otherTransfer->assetRef->blockNum==COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE) &&
-					$this->inputs->match($otherTransfer->inputs) & ($this->outputs->first==$otherTransfer->outputs->first);
+					$this->inputs->match($otherTransfer->inputs) && ($this->outputs->first==$otherTransfer->outputs->first);
 			
 			else
 				return $this->assetRef->match($otherTransfer->assetRef) &&
