@@ -91,11 +91,11 @@ diff Transfer-Output-C.txt Transfer-Output-Python.txt
 
 * Java tests begin by compiling the Java classes:
 
-javac ../java/org/coinspark/protocol/*.java
+javac ../java/src/main/java/org/coinspark/protocol/*.java
 
 * Now run the CoinSparkTest class and keep pressing return to accept all the default options:
 
-java -classpath ../java/ org.coinspark.protocol.CoinSparkTest
+java -classpath ../java/src/main/java/ org.coinspark.protocol.CoinSparkTest
 
 * Now check the corresponding Java and C output files for differencess
 
