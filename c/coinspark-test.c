@@ -1558,7 +1558,7 @@ int main(int argc, const char* argv[])
     int testSuite, countTests;
     bool toDisplay, toFiles;
 
-//  srand((unsigned int)time(NULL)); // if this is commented, the tests will be deterministic (at least on Mac OS X)
+    srand((unsigned int)time(NULL)); // if this is commented, the tests will be deterministic (at least on Mac OS X)
 
 //  Ask the user which tests to perform
     

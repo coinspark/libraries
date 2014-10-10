@@ -281,7 +281,7 @@
 		
 		$needLength=strlen($metadata)+strlen($appendMetadata)-COINSPARK_METADATA_IDENTIFIER_LEN+1; // check there is enough space
 		if ($metadataMaxLen<$needLength)
-			return 0;
+			return null;
 		
 		$lastMetadataLen=strlen($lastMetadata)+1; // include prefix
 		$lastMetadataPos=strlen($metadata)-$lastMetadataLen;
