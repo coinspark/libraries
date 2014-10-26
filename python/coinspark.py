@@ -190,7 +190,7 @@ def CoinSparkMetadataToScript(metadata, toHexScript):
 	if len(metadata)<=75:
 		scriptPubKey=chr(0x6a)+chr(len(metadata))+metadata
 		if toHexScript:
-			scriptPubKey=scriptPubKey.encode('hex').upper()
+			scriptPubKey=CoinSparkRawStringToHex(scriptPubKey).upper()
 		
 		return scriptPubKey
 		
@@ -246,7 +246,12 @@ def CoinSparkCalcAssetHash(name, issuer, description, units, issueDate, expiryDa
 	buffer+=("%.0f" % interestRateToHash)+"\x00"
 	buffer+=("%.0f" % multipleToHash)+"\x00"
 	
-	buffer+=('' if contractContent is None else str(contractContent))+"\x00"
+	buffer=buffer.encode('utf-8')
+	
+	if not contractContent is None:
+		buffer+=contractContent
+		
+	buffer+="\x00".encode('utf-8') # to support Python 2.5 to 3+
 	
 	return hashlib.sha256(buffer).digest()
 
@@ -923,9 +928,9 @@ class CoinSparkGenesis(CoinSparkBase):
 			'https' if self.useHttps else 'http', self.domainName,
 			"coinspark/" if self.usePrefix else "", self.pagePath if len(self.pagePath) else "[spent-txid]",
 			len(self.domainName), len(self.pagePath),
-			domainPathMetadata.encode('hex').upper(), len(domainPathMetadata)
+			CoinSparkRawStringToHex(domainPathMetadata), len(domainPathMetadata)
 		)
-		buffer+="          Asset hash: %s (length %d)\n" % (self.assetHash[:self.assetHashLen].encode('hex').upper(), self.assetHashLen)
+		buffer+="          Asset hash: %s (length %d)\n" % (CoinSparkRawStringToHex(self.assetHash[:self.assetHashLen]), self.assetHashLen)
 		buffer+="END COINSPARK GENESIS\n\n"
 		
 		return buffer
@@ -1519,7 +1524,7 @@ class CoinSparkTransfer(CoinSparkBase):
 		written_array=[
 			self.writeUnsignedField(counts['blockNumBytes'], self.assetRef.blockNum),
 			self.writeUnsignedField(counts['txOffsetBytes'], self.assetRef.txOffset),
-			(self.assetRef.txIDPrefix.decode('hex')+("\x00" * counts['txIDPrefixBytes']))[:counts['txIDPrefixBytes']], # ensure right length
+			(CoinSparkHexToRawString(self.assetRef.txIDPrefix)+("\x00" * counts['txIDPrefixBytes']))[:counts['txIDPrefixBytes']], # ensure right length
 			self.writeUnsignedField(counts['firstInputBytes'], self.inputs.first),
 			self.writeUnsignedField(counts['countInputsBytes'], self.inputs.count),
 			self.writeUnsignedField(counts['firstOutputBytes'], self.outputs.first),
@@ -1647,7 +1652,7 @@ class CoinSparkTransfer(CoinSparkBase):
 		if txIDPrefixBytes==0:
 			read_array.append(True)
 		else:
-			self.assetRef.txIDPrefix="".join(metadataArray[:txIDPrefixBytes]).encode('hex').upper()
+			self.assetRef.txIDPrefix=CoinSparkRawStringToHex("".join(metadataArray[:txIDPrefixBytes]))
 			metadataArray=metadataArray[txIDPrefixBytes:]
 			read_array.append(len(self.assetRef.txIDPrefix)==2*txIDPrefixBytes)
 				
@@ -2363,11 +2368,7 @@ class CoinSparkInOutRange(CoinSparkBase):
 
 def CoinSparkGetRawScript(scriptPubKey, scriptIsHex):
 	if scriptIsHex:
-		if (len(scriptPubKey)%2) or not all(charTest in string.hexdigits for charTest in scriptPubKey):
-			return None
-		else:
-			return scriptPubKey.decode('hex')
-		
+		return CoinSparkHexToRawString(scriptPubKey)
 	else:
 		return scriptPubKey
 
@@ -2409,3 +2410,19 @@ def CoinSparkLocateMetadataRange(metadata, desiredPrefix):
 			position+=foundPrefixOrd # skip over this many bytes
 
 	return None
+	
+
+def CoinSparkHexToRawString(hex):
+	if (len(hex)%2) or not all(charTest in string.hexdigits for charTest in hex):
+		return None
+	else:
+		raw=binascii.a2b_hex(hex)
+		if not isinstance(raw, str): # to support Python 3
+			raw="".join(map(chr, raw))
+	
+	return raw
+	
+
+def CoinSparkRawStringToHex(string):
+	return "".join(["%0.2X" % ord(s) for s in string])
+	

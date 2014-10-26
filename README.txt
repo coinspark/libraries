@@ -1,4 +1,4 @@
-CoinSpark libraries 1.0.2 README - coinspark.org
+CoinSpark libraries README - coinspark.org
 
 
 ABOUT
@@ -11,8 +11,8 @@ The libraries are available in 5 languages:
 * C/C++
 * Java
 * Javascript
-* PHP
-* Python
+* PHP (5+)
+* Python (2.5+, 3+)
 
 The libraries for each language are functionally identical, and use as similar
 calling conventions as possible, given the constraints imposed by each language. 
@@ -148,8 +148,11 @@ THE SOFTWARE.
 CHANGELOG
 ---------
 
+v1.0.3 - 26 October 2014
+* Added support for Python 3.x
+
 v1.0.2 - 9 October 2014
-* Added complete Python library
+* Added complete Python (2.x) library
 * Seed random number generator in C test suite
 * Fixed a return type typo in PHP and Javascript
 

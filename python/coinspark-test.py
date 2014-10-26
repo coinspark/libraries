@@ -6,7 +6,7 @@ def GetNextInputLine(inputSource):
 	inputLine=inputSource.readline()
 	if len(inputLine)==0: # empty string indicates end of file
 		return None;
-		
+	
 	inputLine=inputLine.rstrip("\n")
 	
 	hashPos=inputLine.find(' # ')
@@ -55,7 +55,7 @@ def ProcessInputContents(inputSource):
 		
 		
 def ProcessAddressTests(inputSource):
-	print "CoinSpark Address Tests Output\n"
+	print("CoinSpark Address Tests Output\n")
 	
 	while True:
 		inputLine=GetNextInputLine(inputSource)
@@ -79,7 +79,7 @@ def ProcessAddressTests(inputSource):
 			
 
 def ProcessAssetRefTests(inputSource):
-	print "CoinSpark AssetRef Tests Output\n"
+	print("CoinSpark AssetRef Tests Output\n")
 	
 	while True:
 		inputLine=GetNextInputLine(inputSource)
@@ -103,7 +103,7 @@ def ProcessAssetRefTests(inputSource):
 
 
 def ProcessScriptTests(inputSource):
-	print "CoinSpark Script Tests Output\n";
+	print("CoinSpark Script Tests Output\n");
 	
 	while True:
 		inputLines=GetNextInputLines(inputSource, 4)
@@ -227,7 +227,7 @@ def ProcessScriptTests(inputSource):
 
 
 def ProcessHashTests(inputSource):
-	print "CoinSpark Hash Tests Output\n"
+	print("CoinSpark Hash Tests Output\n")
 	
 	while True:
 		inputLines=GetNextInputLines(inputSource, 10)
@@ -236,13 +236,15 @@ def ProcessHashTests(inputSource):
 			
 		name, issuer, description, units, issueDate, expiryDate, interestRate, multiple, contractContent, dummy = inputLines
 		
+		contractContent=contractContent.encode('utf-8')
+		
 		hash=CoinSparkCalcAssetHash(name, issuer, description, units, issueDate, expiryDate, interestRate, multiple, contractContent)
 		
-		print hash.encode('hex').upper()
+		print(binascii.hexlify(hash).upper().decode('utf-8'))
 
 
 def ProcessGenesisTests(inputSource):
-	print "CoinSpark Genesis Tests Output\n"
+	print("CoinSpark Genesis Tests Output\n")
 	
 	while True:
 		inputLines=GetNextInputLines(inputSource, 7)
@@ -254,7 +256,7 @@ def ProcessGenesisTests(inputSource):
 		firstSpentTxId, firstSpentVout, metadataHex, outputsSatoshisString, outputsRegularString, feeSatoshis, dummy = inputLines
 
 		genesis=CoinSparkGenesis()
-		if not genesis.decode(metadataHex.decode('hex')):
+		if not genesis.decode(CoinSparkHexToRawString(metadataHex)):
 			sys.exit("Failed to decode genesis metadata: "+metadataHex)
 			
 		outputsSatoshis=outputsSatoshisString.split(',')
@@ -272,13 +274,13 @@ def ProcessGenesisTests(inputSource):
 			
 		# Output the results
 		
-		print "%.0f # transaction fee satoshis to be valid" % validFeeSatoshis
-		print ",".join(["%.0f" % outputBalance for outputBalance in outputBalances])+" # units of the asset in each output"
-		print genesis.calcAssetURL(firstSpentTxId, firstSpentVout)+" # asset web page URL\n"
+		print("%.0f # transaction fee satoshis to be valid" % validFeeSatoshis)
+		print(",".join(["%.0f" % outputBalance for outputBalance in outputBalances])+" # units of the asset in each output")
+		print(genesis.calcAssetURL(firstSpentTxId, firstSpentVout)+" # asset web page URL\n")
 		
 		
 def ProcessTransferTests(inputSource):
-	print "CoinSpark Transfer Tests Output\n"
+	print("CoinSpark Transfer Tests Output\n")
 	
 	while True:
 		inputLines=GetNextInputLines(inputSource, 8)
@@ -291,7 +293,7 @@ def ProcessTransferTests(inputSource):
 			outputsSatoshisString, outputsRegularString, feeSatoshis, dummy) = inputLines
 
 		genesis=CoinSparkGenesis()
-		if not genesis.decode(genesisMetadataHex.decode('hex')):
+		if not genesis.decode(CoinSparkHexToRawString(genesisMetadataHex)):
 			sys.exit("Failed to decode genesis metadata: "+genesisMetadataHex)
 			
 		assetRef=CoinSparkAssetRef()
@@ -306,7 +308,7 @@ def ProcessTransferTests(inputSource):
 		countOutputs=len(outputsSatoshis)
 	
 		transfers=CoinSparkTransferList()
-		if not transfers.decode(transfersMetadataHex.decode('hex'), countInputs, countOutputs):
+		if not transfers.decode(CoinSparkHexToRawString(transfersMetadataHex), countInputs, countOutputs):
 			sys.exit("Failed to decode transfers metadata: "+transfersMetadataHex)
 		validFeeSatoshis=transfers.calcMinFee(countInputs, outputsSatoshis, outputsRegular)
 			
@@ -321,9 +323,9 @@ def ProcessTransferTests(inputSource):
 		
 		# Output the results
 		
-		print "%.0f # transaction fee satoshis to be valid" % validFeeSatoshis
-		print ",".join(["%.0f" % outputBalance for outputBalance in outputBalances])+" # units of this asset in each output"
-		print ",".join(['1' if outputDefault else '0' for outputDefault in outputsDefault])+" # boolean flags whether each output is in a default route\n"
+		print("%.0f # transaction fee satoshis to be valid" % validFeeSatoshis)
+		print(",".join(["%.0f" % outputBalance for outputBalance in outputBalances])+" # units of this asset in each output")
+		print(",".join(['1' if outputDefault else '0' for outputDefault in outputsDefault])+" # boolean flags whether each output is in a default route\n")
 		
 		# Test the net and gross calculations using the input balances as example net values
 	
@@ -343,7 +345,7 @@ if len(sys.argv)<2:
 inputFileName=sys.argv[1]
 
 if os.path.isfile(inputFileName):
-	inputSource=open(inputFileName, 'rb')
+	inputSource=open(inputFileName, 'r')
 	ProcessInputContents(inputSource);
 	inputSource.close()
 
