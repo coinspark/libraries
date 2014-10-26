@@ -150,6 +150,7 @@ CHANGELOG
 
 v1.0.3 - 26 October 2014
 * Added support for Python 3.x
+* Added import required for paymentRef.randomize() on Python
 
 v1.0.2 - 9 October 2014
 * Added complete Python (2.x) library

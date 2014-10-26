@@ -21,7 +21,7 @@
 # THE SOFTWARE.
 
 
-import math, string, re, hashlib, binascii
+import math, string, re, hashlib, binascii, random
 
 
 # Quasi-constants for use by clients of the library
@@ -2286,7 +2286,7 @@ class CoinSparkPaymentRef(CoinSparkBase):
 			self.ref+=random.randint(0, 8191)
 			bitsRemaining=math.floor(bitsRemaining/8192)
 	
-		self.ref=math.round(self.ref%(1+COINSPARK_PAYMENT_REF_MAX))	
+		self.ref=round(self.ref%(1+COINSPARK_PAYMENT_REF_MAX))	
 		
 		return self.ref
 
