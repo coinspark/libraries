@@ -2,7 +2,7 @@ CoinSpark Library for Java
 
 Usage
 -----
-The recommended way to integrate the CoinSpark library into your application is to use the stable packages which are made availble in the Maven repository.
+The recommended way to integrate the CoinSpark library into your application is to use the stable packages which are made availble in the Maven central repository.
 
 Add the following lines to your project's pom.xml file:
 
@@ -24,5 +24,5 @@ This will build and place the library into your local maven repository, usually 
 
 Tips
 ----
-Change the version number from 1.0.3 to something like 1.0.3-HACKING and make sure you update any dependencies.  If you are hcaking on Sparkbit, update the dependency in the pom.xml of SparkBit and SparkBit's version of BitcoinJ.
+Change the version number from 1.0.3 to something like 1.0.3-HACKING and make sure you update any dependencies.  If you are hacking on Sparkbit, update the dependency in the pom.xml of SparkBit and SparkBit's version of BitcoinJ.
 
