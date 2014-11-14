@@ -13,6 +13,20 @@ Add the following lines to your project's pom.xml file:
 </dependency>
 
 
+Verifying Signatures
+--------------------
+Packages are signed and you can verify using public key 95B6A985 : http://pgp.mit.edu:11371/pks/lookup?op=get&search=0x1B26FA6F95B6A985
+
+For example,
+
+gpg --verify coinspark-library-1.0.3.jar.asc
+
+Should return:
+
+gpg: Signature made Thu 13 Nov 2014 09:59:39 PM PST using RSA key ID 95B6A985
+gpg: Good signature from "Simon Liu (CoinSpark) <simon@coinsciences.com>"
+
+
 Building
 --------
 If you want to build locally, simply do the following:
