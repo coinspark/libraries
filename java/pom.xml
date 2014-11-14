@@ -1,23 +1,20 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
   <groupId>org.coinspark.library</groupId>
   <artifactId>coinspark-library</artifactId>
   <version>1.0.3</version>
   <packaging>jar</packaging>
-
   <name>coinspark-library</name>
   <url>http://github.com/coinspark/libraries</url>
-	  
-	  <scm>
-		  <connection>scm:git:git@github.com:coinspark/libraries.git</connection>
-  <developerConnection>scm:git:git@github.com:coinspark/libraries.git</developerConnection>
-  <url>git@github.com:coinspark/libraries.git</url>
-</scm>
-<licenses>
+  <scm>
+    <connection>scm:git:git@github.com:coinspark/libraries.git</connection>
+    <developerConnection>scm:git:git@github.com:coinspark/libraries.git</developerConnection>
+    <url>git@github.com:coinspark/libraries.git</url>
+  </scm>
+  <licenses>
     <license>
-		<name>MIT</name>
+      <name>MIT</name>
       <url>http://opensource.org/licenses/mit-license.php</url>
     </license>
   </licenses>
@@ -32,33 +29,30 @@
   	  The CoinSpark libraries help you integrate support for the CoinSpark protocol into your wallet,
   	  or any other tool or service.
   </description>
-
-  
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
-  
   <build>
     <plugins>
-        <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-compiler-plugin</artifactId>
-            <version>2.3.2</version>
-            <configuration>
-                <source>7</source>
-                <target>7</target>
-                <showDeprecation>true</showDeprecation>
-                <showWarnings>true</showWarnings>
-            </configuration>
-        </plugin>
-        <plugin>
-  <artifactId>maven-install-plugin</artifactId>
-  <version>2.3.1</version>
-  <configuration>
-    <createChecksum>true</createChecksum>
-  </configuration>
-</plugin>
- <!-- Use the Enforcer to verify build integrity -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>2.3.2</version>
+        <configuration>
+          <source>7</source>
+          <target>7</target>
+          <showDeprecation>true</showDeprecation>
+          <showWarnings>true</showWarnings>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>2.3.1</version>
+        <configuration>
+          <createChecksum>true</createChecksum>
+        </configuration>
+      </plugin>
+      <!-- Use the Enforcer to verify build integrity -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
@@ -73,26 +67,25 @@
             <configuration>
               <rules>
                 <digestRule implementation="uk.co.froot.maven.enforcer.DigestRule">
-
                   <!-- Create a snapshot to build the list of URNs below -->
-				  <buildSnapshot>true</buildSnapshot>
-				  <!-- List of required hashes -->
+                  <buildSnapshot>true</buildSnapshot>
+                  <!-- List of required hashes -->
                   <!-- Format is URN of groupId:artifactId:version:type:classifier:scope:hash -->
                   <!-- classifier is "null" if not present -->
                   <urns>
-                  	  <urn>junit:junit:4.11:jar:null:test:4e031bb61df09069aeb2bffb4019e7a5034a4ee0</urn>
-   <urn>org.apache.commons:commons-lang3:3.3.2:jar:null:compile:90a3822c38ec8c996e84c16a3477ef632cbc87a3</urn>
-   <urn>org.apache.commons:commons-math3:3.3:jar:null:compile:a85dc3aa929de625606270ae69a343cda69b7670</urn>
-   <urn>org.apache.maven.plugins:maven-clean-plugin:2.3:maven-plugin:null:runtime:5cd0c5013640d238a941465520712e2a7610a320</urn>
-   <urn>org.apache.maven.plugins:maven-compiler-plugin:2.3.2:maven-plugin:null:runtime:e511c0bc38ae8a4d32b735a8c22ce94e51324c1d</urn>
-   <urn>org.apache.maven.plugins:maven-deploy-plugin:2.7:maven-plugin:null:runtime:6dadfb75679ca010b41286794f737088ebfe12fd</urn>
-   <urn>org.apache.maven.plugins:maven-enforcer-plugin:1.2:maven-plugin:null:runtime:6b755a9a0d618f8f57c0b5c4a0737a012e710a46</urn>
-   <urn>org.apache.maven.plugins:maven-install-plugin:2.3.1:maven-plugin:null:runtime:fe692c15450a75d330510bffe9491264918f58e0</urn>
-   <urn>org.apache.maven.plugins:maven-jar-plugin:2.2:maven-plugin:null:runtime:0533aae388d0cd2a55c8ea1c48f7d32d0927ac9a</urn>
-   <urn>org.apache.maven.plugins:maven-resources-plugin:2.3:maven-plugin:null:runtime:648f725a387d5b38c86d5837b8c2cf456f8d93c7</urn>
-   <urn>org.apache.maven.plugins:maven-site-plugin:3.0:maven-plugin:null:runtime:39e1d8d4dae56f948e0028890c426c2002331e8c</urn>
-   <urn>org.apache.maven.plugins:maven-surefire-plugin:2.10:maven-plugin:null:runtime:311b64c90d02f51585713f1bfd927f54eb5cc7ba</urn>
- <!-- A check for the rules themselves -->
+                    <urn>junit:junit:4.11:jar:null:test:4e031bb61df09069aeb2bffb4019e7a5034a4ee0</urn>
+                    <urn>org.apache.commons:commons-lang3:3.3.2:jar:null:compile:90a3822c38ec8c996e84c16a3477ef632cbc87a3</urn>
+                    <urn>org.apache.commons:commons-math3:3.3:jar:null:compile:a85dc3aa929de625606270ae69a343cda69b7670</urn>
+                    <urn>org.apache.maven.plugins:maven-clean-plugin:2.3:maven-plugin:null:runtime:5cd0c5013640d238a941465520712e2a7610a320</urn>
+                    <urn>org.apache.maven.plugins:maven-compiler-plugin:2.3.2:maven-plugin:null:runtime:e511c0bc38ae8a4d32b735a8c22ce94e51324c1d</urn>
+                    <urn>org.apache.maven.plugins:maven-deploy-plugin:2.7:maven-plugin:null:runtime:6dadfb75679ca010b41286794f737088ebfe12fd</urn>
+                    <urn>org.apache.maven.plugins:maven-enforcer-plugin:1.2:maven-plugin:null:runtime:6b755a9a0d618f8f57c0b5c4a0737a012e710a46</urn>
+                    <urn>org.apache.maven.plugins:maven-install-plugin:2.3.1:maven-plugin:null:runtime:fe692c15450a75d330510bffe9491264918f58e0</urn>
+                    <urn>org.apache.maven.plugins:maven-jar-plugin:2.2:maven-plugin:null:runtime:0533aae388d0cd2a55c8ea1c48f7d32d0927ac9a</urn>
+                    <urn>org.apache.maven.plugins:maven-resources-plugin:2.3:maven-plugin:null:runtime:648f725a387d5b38c86d5837b8c2cf456f8d93c7</urn>
+                    <urn>org.apache.maven.plugins:maven-site-plugin:3.0:maven-plugin:null:runtime:39e1d8d4dae56f948e0028890c426c2002331e8c</urn>
+                    <urn>org.apache.maven.plugins:maven-surefire-plugin:2.10:maven-plugin:null:runtime:311b64c90d02f51585713f1bfd927f54eb5cc7ba</urn>
+                    <!-- A check for the rules themselves -->
                     <urn>uk.co.froot.maven.enforcer:digest-enforcer-rules:0.0.1:jar:null:runtime:16a9e04f3fe4bb143c42782d07d5faf65b32106f</urn>
                   </urns>
                 </digestRule>
@@ -100,7 +93,6 @@
             </configuration>
           </execution>
         </executions>
-
         <!-- Ensure we download the enforcer rules -->
         <dependencies>
           <dependency>
@@ -109,28 +101,25 @@
             <version>0.0.1</version>
           </dependency>
         </dependencies>
-
       </plugin>
-
-	  <plugin>
+      <plugin>
         <artifactId>maven-deploy-plugin</artifactId>
         <configuration>
           <skip>true</skip>
         </configuration>
       </plugin>
-
-    <plugin>
-      <groupId>org.sonatype.plugins</groupId>
-      <artifactId>nexus-staging-maven-plugin</artifactId>
-      <version>1.6.5</version>
-      <extensions>true</extensions>
-      <configuration>
-        <serverId>sonatype</serverId>
-        <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-        <autoReleaseAfterClose>false</autoReleaseAfterClose>
-        <stagingProfileId>7d12f2f382dce9</stagingProfileId>
-	</configuration>
-	<!--<executions>
+      <plugin>
+        <groupId>org.sonatype.plugins</groupId>
+        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <version>1.6.5</version>
+        <extensions>true</extensions>
+        <configuration>
+          <serverId>coinspark-release</serverId>
+          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+          <autoReleaseAfterClose>false</autoReleaseAfterClose>
+          <stagingProfileId>7d12f2f382dce9</stagingProfileId>
+        </configuration>
+        <!--<executions>
           <execution>
             <id>sonatype</id>
             <phase>deploy</phase>
@@ -141,64 +130,74 @@
           </execution>
 		</executions>
 		-->
-    </plugin>
-
-    <plugin>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-source-plugin</artifactId>
-      <version>2.2.1</version>
-      <executions>
-        <execution>
-          <id>attach-sources</id>
-          <goals>
-            <goal>jar-no-fork</goal>
-          </goals>
-        </execution>
-      </executions>
-    </plugin>
-    <plugin>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-javadoc-plugin</artifactId>
-      <version>2.9.1</version>
-      <executions>
-        <execution>
-          <id>attach-javadocs</id>
-          <goals>
-            <goal>jar</goal>
-          </goals>
-        </execution>
-      </executions>
-    </plugin>
-    <plugin>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-gpg-plugin</artifactId>
-      <version>1.5</version>
-      <executions>
-        <execution>
-          <id>sign-artifacts</id>
-          <phase>verify</phase>
-          <goals>
-            <goal>sign</goal>
-          </goals>
-        </execution>
-      </executions>
-    </plugin>
-    
+      </plugin>
     </plugins>
-  </build>                         
-  
- <distributionManagement>
-  <snapshotRepository>
-    <id>sonatype</id>
-    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-  </snapshotRepository>
-  	<repository>
-      <id>sonatype</id>
+  </build>
+  <profiles>
+    <profile>
+      <id>coinspark-snapshot</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+    </profile>
+    <profile>
+      <id>coinspark-release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>2.2.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>2.9.1</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.5</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+  <distributionManagement>
+    <snapshotRepository>
+      <id>coinspark-snapshot</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
+    <repository>
+      <id>coinspark-release</id>
       <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
     </repository>
- </distributionManagement>
-
-
+  </distributionManagement>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -206,7 +205,7 @@
       <version>4.11</version>
       <scope>test</scope>
     </dependency>
-	<!--
+    <!--
 	<dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
@@ -225,3 +224,41 @@
 	-->
   </dependencies>
 </project>
+<!-- EXAMPLE OF SETTINGS.XML TO BE PLACED IN ~/.m2 TO DEPLOY TO SONATYPE -->
+<!--
+<settings>
+  <servers>
+      <server>
+      <id>coinspark-snapshot</id>
+      <username>MY_SONATYPE_LOGIN</username>
+      <password>MY_SONATYPE_PASSWORD</password>
+      </server>
+  	  <server>
+      <id>coinspark-release</id>
+      <username>MY_SONATYPE_LOGIN</username>
+      <password>MY_SONATYPE_PASSWORD</password>
+    </server>
+  </servers>
+  <profiles>
+    <profile>
+		<id>coinspark-snapshot</id>
+		<activation>
+			<activeByDefault>true</activeByDefault>
+		</activation>
+		<properties>
+		</properties>
+	</profile>
+    <profile>
+      <id>coinspark-release</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+		  <gpg.executable>gpg2</gpg.executable>
+		  <gpg.keyname>THE_GPG_KEY_ID</gpg.keyname>
+          <gpg.passphrase>THE_GPG_SECRET</gpg.passphrase>
+      </properties>
+    </profile>
+  </profiles>
+</settings>
+-->
