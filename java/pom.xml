@@ -4,12 +4,36 @@
 
   <groupId>org.coinspark.library</groupId>
   <artifactId>coinspark-library</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0.3</version>
   <packaging>jar</packaging>
 
   <name>coinspark-library</name>
-  <url>http://maven.apache.org</url>
+  <url>http://github.com/coinspark/libraries</url>
+	  
+	  <scm>
+		  <connection>scm:git:git@github.com:coinspark/libraries.git</connection>
+  <developerConnection>scm:git:git@github.com:coinspark/libraries.git</developerConnection>
+  <url>git@github.com:coinspark/libraries.git</url>
+</scm>
+<licenses>
+    <license>
+		<name>MIT</name>
+      <url>http://opensource.org/licenses/mit-license.php</url>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <name>Coinspark Developers</name>
+      <organization>Coinspark</organization>
+      <organizationUrl>http://www.coinspark.org</organizationUrl>
+    </developer>
+  </developers>
+  <description>CoinSpark is a lightweight scalable solution for colored coins.
+  	  The CoinSpark libraries help you integrate support for the CoinSpark protocol into your wallet,
+  	  or any other tool or service.
+  </description>
 
+  
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
@@ -88,9 +112,93 @@
 
       </plugin>
 
+	  <plugin>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
+
+    <plugin>
+      <groupId>org.sonatype.plugins</groupId>
+      <artifactId>nexus-staging-maven-plugin</artifactId>
+      <version>1.6.5</version>
+      <extensions>true</extensions>
+      <configuration>
+        <serverId>sonatype</serverId>
+        <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+        <autoReleaseAfterClose>false</autoReleaseAfterClose>
+        <stagingProfileId>7d12f2f382dce9</stagingProfileId>
+	</configuration>
+	<!--<executions>
+          <execution>
+            <id>sonatype</id>
+            <phase>deploy</phase>
+            <goals>
+              <goal>deploy</goal>
+              <goal>release</goal>
+            </goals>
+          </execution>
+		</executions>
+		-->
+    </plugin>
+
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-source-plugin</artifactId>
+      <version>2.2.1</version>
+      <executions>
+        <execution>
+          <id>attach-sources</id>
+          <goals>
+            <goal>jar-no-fork</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-javadoc-plugin</artifactId>
+      <version>2.9.1</version>
+      <executions>
+        <execution>
+          <id>attach-javadocs</id>
+          <goals>
+            <goal>jar</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-gpg-plugin</artifactId>
+      <version>1.5</version>
+      <executions>
+        <execution>
+          <id>sign-artifacts</id>
+          <phase>verify</phase>
+          <goals>
+            <goal>sign</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+    
     </plugins>
   </build>                         
   
+ <distributionManagement>
+  <snapshotRepository>
+    <id>sonatype</id>
+    <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+  </snapshotRepository>
+  	<repository>
+      <id>sonatype</id>
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
+ </distributionManagement>
+
+
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
