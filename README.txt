@@ -148,6 +148,9 @@ THE SOFTWARE.
 CHANGELOG
 ---------
 
+v1.0.4 - 24 November 2014
+* Fixed typo in PHP's CoinSparkQueryAssetTrackingServer() function
+
 v1.0.3 - 26 October 2014
 * Added support for Python 3.x
 * Added import required for paymentRef.randomize() on Python
