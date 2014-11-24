@@ -2732,7 +2732,7 @@
 			'id' => $request_id,
 			'method' => 'coinspark_assets_get_qty',
 			'params' => array(
-				'assets' => array_values($colors),
+				'assets' => array_values($assets),
 				'txouts' => $request_txouts,
 			),
 		);
