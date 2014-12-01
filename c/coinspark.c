@@ -1,7 +1,7 @@
 /*
- * CoinSpark 1.0 - C library
+ * CoinSpark 1.5 - C library
  *
- * Copyright (c) 2014 Coin Sciences Ltd
+ * Copyright (c) Coin Sciences Ltd
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -43,6 +43,7 @@
 #define COINSPARK_GENESIS_PREFIX 'g'
 #define COINSPARK_TRANSFERS_PREFIX 't'
 #define COINSPARK_PAYMENTREF_PREFIX 'r'
+#define COINSPARK_MESSAGE_PREFIX 'm'
 
 #define COINSPARK_FEE_BASIS_MAX_SATOSHIS 1000
 
@@ -86,10 +87,12 @@
 #define COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT 0
 
 #define COINSPARK_PACKING_EXTEND_MASK 0x07
-#define COINSPARK_PACKING_EXTEND_0P 0x00 // index 0 only or previous
-#define COINSPARK_PACKING_EXTEND_1S 0x01 // index 1 only or subsequent single
-#define COINSPARK_PACKING_EXTEND_BYTE 0x02 // 1 byte for single index
-#define COINSPARK_PACKING_EXTEND_2_BYTES 0x03 // 2 bytes for single index
+#define COINSPARK_PACKING_EXTEND_0P 0x00 // index 0 or previous (transfers only)
+#define COINSPARK_PACKING_EXTEND_PUBLIC 0x00 // this is public (messages only)
+#define COINSPARK_PACKING_EXTEND_1S 0x01 // index 1 or subsequent to previous (transfers only)
+#define COINSPARK_PACKING_EXTEND_0_1_BYTE 0x01 // starting at 0, 1 byte for count (messages only)
+#define COINSPARK_PACKING_EXTEND_1_0_BYTE 0x02 // 1 byte for single index, count is 1
+#define COINSPARK_PACKING_EXTEND_2_0_BYTES 0x03 // 2 bytes for single index, count is 1
 #define COINSPARK_PACKING_EXTEND_1_1_BYTES 0x04 // 1 byte for first index, 1 byte for count
 #define COINSPARK_PACKING_EXTEND_2_1_BYTES 0x05 // 2 bytes for first index, 1 byte for count
 #define COINSPARK_PACKING_EXTEND_2_2_BYTES 0x06 // 2 bytes for first index, 2 bytes for count
@@ -111,6 +114,16 @@
 #define COINSPARK_TRANSFER_QTY_FLOAT_MASK 0x3FFF
 #define COINSPARK_TRANSFER_QTY_FLOAT_EXPONENT_MULTIPLE 1001
 
+#define COINSPARK_OUTPUTS_MORE_FLAG 0x80
+#define COINSPARK_OUTPUTS_RESERVED_MASK 0x60
+#define COINSPARK_OUTPUTS_TYPE_MASK 0x18
+#define COINSPARK_OUTPUTS_TYPE_SINGLE 0x00 // one output index (0...7)
+#define COINSPARK_OUTPUTS_TYPE_FIRST 0x08 // first (0...7) outputs
+#define COINSPARK_OUTPUTS_TYPE_UNUSED 0x10 // for future use
+#define COINSPARK_OUTPUTS_TYPE_EXTEND 0x18 // "extend", including public/all
+#define COINSPARK_OUTPUTS_VALUE_MASK 0x07
+#define COINSPARK_OUTPUTS_VALUE_MAX 7
+
 #define COINSPARK_ADDRESS_PREFIX 's'
 #define COINSPARK_ADDRESS_FLAG_CHARS_MULTIPLE 10
 #define COINSPARK_ADDRESS_CHAR_INCREMENT 13
@@ -122,8 +135,9 @@ typedef enum { // options to use in order of priority
     _0P=0,
     _1S,
     _ALL,
-    _BYTE,
-    _2_BYTES,
+    _1_0_BYTE,
+    _0_1_BYTE,
+    _2_0_BYTES,
     _1_1_BYTES,
     _2_1_BYTES,
     _2_2_BYTES,
@@ -134,8 +148,9 @@ static const char packingExtendMap[]={ // same order as above
     COINSPARK_PACKING_EXTEND_0P,
     COINSPARK_PACKING_EXTEND_1S,
     COINSPARK_PACKING_EXTEND_ALL,
-    COINSPARK_PACKING_EXTEND_BYTE,
-    COINSPARK_PACKING_EXTEND_2_BYTES,
+    COINSPARK_PACKING_EXTEND_1_0_BYTE,
+    COINSPARK_PACKING_EXTEND_0_1_BYTE,
+    COINSPARK_PACKING_EXTEND_2_0_BYTES,
     COINSPARK_PACKING_EXTEND_1_1_BYTES,
     COINSPARK_PACKING_EXTEND_2_1_BYTES,
     COINSPARK_PACKING_EXTEND_2_2_BYTES
@@ -480,7 +495,7 @@ static void GetDefaultRouteMap(const CoinSparkTransfer* transfers, const int cou
         }
 }
 
-static void GetPackingOptions(const CoinSparkIORange *previousRange, const CoinSparkIORange *range, const int countInputOutputs, PackingOptions packingOptions)
+static void GetPackingOptions(const CoinSparkIORange *previousRange, const CoinSparkIORange *range, const int countInputOutputs, PackingOptions packingOptions, bool forMessages)
 {
     bool firstZero, firstByte, first2Bytes, countOne, countByte;
     
@@ -490,17 +505,26 @@ static void GetPackingOptions(const CoinSparkIORange *previousRange, const CoinS
     countOne=(range->count==1);
     countByte=(range->count<=COINSPARK_UNSIGNED_BYTE_MAX);
     
-    if (previousRange) {
-        packingOptions[_0P]=(range->first==previousRange->first) && (range->count==previousRange->count);
-        packingOptions[_1S]=(range->first==(previousRange->first+previousRange->count)) && countOne;
+    if (forMessages) {
+        packingOptions[_0P]=FALSE;
+        packingOptions[_1S]=FALSE; // these two options not used for messages
+        packingOptions[_0_1_BYTE]=firstZero && countByte;
         
     } else {
-        packingOptions[_0P]=firstZero && countOne;
-        packingOptions[_1S]=(range->first==1) && countOne;
+        if (previousRange) {
+            packingOptions[_0P]=(range->first==previousRange->first) && (range->count==previousRange->count);
+            packingOptions[_1S]=(range->first==(previousRange->first+previousRange->count)) && countOne;
+            
+        } else {
+            packingOptions[_0P]=firstZero && countOne;
+            packingOptions[_1S]=(range->first==1) && countOne;
+        }
+        
+        packingOptions[_0_1_BYTE]=FALSE; // this option not used for transfers
     }
     
-    packingOptions[_BYTE]=firstByte && countOne;
-    packingOptions[_2_BYTES]=first2Bytes && countOne;
+    packingOptions[_1_0_BYTE]=firstByte && countOne;
+    packingOptions[_2_0_BYTES]=first2Bytes && countOne;
     packingOptions[_1_1_BYTES]=firstByte && countByte;
     packingOptions[_2_1_BYTES]=first2Bytes && countByte;
     packingOptions[_2_2_BYTES]=first2Bytes && (range->count<=COINSPARK_UNSIGNED_2_BYTES_MAX);
@@ -530,8 +554,12 @@ static void PackingTypeToValues(const PackingType packingType, const CoinSparkIO
             range->count=1;
             break;
             
-        case _BYTE:
-        case _2_BYTES:
+        case _0_1_BYTE:
+            range->first=0;
+            break;
+            
+        case _1_0_BYTE:
+        case _2_0_BYTES:
             range->count=1;
             break;
             
@@ -541,6 +569,38 @@ static void PackingTypeToValues(const PackingType packingType, const CoinSparkIO
             break;
             
         default: // to prevent compiler warning
+            break;
+    }
+}
+
+static void PackingExtendAddByteCounts(char packingExtend, size_t* firstBytes, size_t* countBytes)
+{
+    switch (packingExtend) {
+        case COINSPARK_PACKING_EXTEND_0_1_BYTE:
+            *countBytes=1;
+            break;
+            
+        case COINSPARK_PACKING_EXTEND_1_0_BYTE:
+            *firstBytes=1;
+            break;
+            
+        case COINSPARK_PACKING_EXTEND_2_0_BYTES:
+            *firstBytes=2;
+            break;
+            
+        case COINSPARK_PACKING_EXTEND_1_1_BYTES:
+            *firstBytes=1;
+            *countBytes=1;
+            break;
+            
+        case COINSPARK_PACKING_EXTEND_2_1_BYTES:
+            *firstBytes=2;
+            *countBytes=1;
+            break;
+            
+        case COINSPARK_PACKING_EXTEND_2_2_BYTES:
+            *firstBytes=2;
+            *countBytes=2;
             break;
     }
 }
@@ -587,63 +647,10 @@ static void PackingToByteCounts(char packing, char packingExtend, PackingByteCou
 //  Packing for input and output indices (relevant for extended indices only)
     
     if ((packing & COINSPARK_PACKING_INDICES_MASK) == COINSPARK_PACKING_INDICES_EXTEND) {
-    
-    //  Input indices
-        
-        switch ((packingExtend >> COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK)
-        {
-            case COINSPARK_PACKING_EXTEND_BYTE:
-                counts->firstInputBytes=1;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_2_BYTES:
-                counts->firstInputBytes=2;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_1_1_BYTES:
-                counts->firstInputBytes=1;
-                counts->countInputsBytes=1;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_2_1_BYTES:
-                counts->firstInputBytes=2;
-                counts->countInputsBytes=1;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_2_2_BYTES:
-                counts->firstInputBytes=2;
-                counts->countInputsBytes=2;
-                break;
-        }
-        
-    //  Output indices
-        
-        switch ((packingExtend >> COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK)
-        {
-            case COINSPARK_PACKING_EXTEND_BYTE:
-                counts->firstOutputBytes=1;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_2_BYTES:
-                counts->firstOutputBytes=2;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_1_1_BYTES:
-                counts->firstOutputBytes=1;
-                counts->countOutputsBytes=1;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_2_1_BYTES:
-                counts->firstOutputBytes=2;
-                counts->countOutputsBytes=1;
-                break;
-                
-            case COINSPARK_PACKING_EXTEND_2_2_BYTES:
-                counts->firstOutputBytes=2;
-                counts->countOutputsBytes=2;
-                break;
-        }
-        
+        PackingExtendAddByteCounts((packingExtend >> COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK,
+            &counts->firstInputBytes, &counts->countInputsBytes);
+        PackingExtendAddByteCounts((packingExtend >> COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK,
+            &counts->firstOutputBytes, &counts->countOutputsBytes);
     }
     
 //  Packing for quantity
@@ -689,17 +696,46 @@ static bool EncodePackingExtend(const PackingOptions packingOptions, char *packi
     return FALSE;
 }
 
-static bool DecodePackingExtend(const char packingExtend, PackingType *packingType)
+static bool DecodePackingExtend(const char packingExtend, PackingType *packingType, bool forMessages)
 {
     PackingType option;
     
     for (option=firstPackingType; option<countPackingTypes; option++)
-        if (packingExtend==packingExtendMap[option]) {
-            *packingType=option;
-            return TRUE;
-        }
+        if (packingExtend==packingExtendMap[option])
+            if (option!=(forMessages ? _1S : _0_1_BYTE)) { // no _1S for messages, no _0_1_BYTE for transfers
+                *packingType=option;
+                return TRUE;
+            }
     
     return FALSE;
+}
+
+static bool GetMessageOutputRangePacking(const CoinSparkIORange *outputRange, int countOutputs, char* packing, size_t *firstBytes, size_t *countBytes)
+{
+    PackingOptions packingOptions;
+    char packingExtend;
+    
+    GetPackingOptions(NULL, outputRange, countOutputs, packingOptions, TRUE);
+    
+    *firstBytes=0;
+    *countBytes=0;
+    
+    if (packingOptions[_1_0_BYTE] && (outputRange->first<=COINSPARK_OUTPUTS_VALUE_MAX)) // inline single output
+        *packing=COINSPARK_OUTPUTS_TYPE_SINGLE | (outputRange->first & COINSPARK_OUTPUTS_VALUE_MASK);
+    
+    else if (packingOptions[_0_1_BYTE] && (outputRange->count<=COINSPARK_OUTPUTS_VALUE_MAX)) // inline first few outputs
+        *packing=COINSPARK_OUTPUTS_TYPE_FIRST | (outputRange->count & COINSPARK_OUTPUTS_VALUE_MASK);
+    
+    else { // we'll be taking additional bytes
+        if (!EncodePackingExtend(packingOptions, &packingExtend))
+            return FALSE;
+        
+        PackingExtendAddByteCounts(packingExtend, firstBytes, countBytes);
+        
+        *packing=COINSPARK_OUTPUTS_TYPE_EXTEND | (packingExtend & COINSPARK_OUTPUTS_VALUE_MASK);
+    }
+    
+    return TRUE;
 }
 
 static bool LocateMetadataRange(const char** _metadataPtr, const char** _metadataEnd, char desiredPrefix)
@@ -1233,6 +1269,46 @@ static void TransfersGroupOrdering(const CoinSparkTransfer* transfers, int* orde
     free(transferUsed);
 }
 
+static int NormalizeIORanges(const CoinSparkIORange* inRanges, CoinSparkIORange* outRanges, int countRanges)
+{
+    int rangeIndex, orderIndex, lowestRangeIndex, lowestRangeFirst, countRemoved, lastRangeEnd, thisRangeEnd;
+    bool *rangeUsed;
+    
+    rangeUsed=(bool*)malloc(countRanges*sizeof(*rangeUsed));
+    
+    for (rangeIndex=0; rangeIndex<countRanges; rangeIndex++)
+        rangeUsed[rangeIndex]=FALSE;
+    
+    countRemoved=0;
+    
+    for (orderIndex=0; orderIndex<countRanges; orderIndex++) {
+        lowestRangeFirst=0;
+        lowestRangeIndex=-1;
+        
+        for (rangeIndex=0; rangeIndex<countRanges; rangeIndex++)
+            if (!rangeUsed[rangeIndex])
+                if ( (lowestRangeIndex==-1) || (inRanges[rangeIndex].first<lowestRangeFirst) ) {
+                    lowestRangeFirst=inRanges[rangeIndex].first;
+                    lowestRangeIndex=rangeIndex;
+                }
+        
+        if ((orderIndex>0) && (inRanges[lowestRangeIndex].first<=lastRangeEnd)) { // we can combine two adjacent ranges
+            countRemoved++;
+            thisRangeEnd=inRanges[lowestRangeIndex].first+inRanges[lowestRangeIndex].count;
+            outRanges[orderIndex-countRemoved].count=COINSPARK_MAX(lastRangeEnd, thisRangeEnd)-outRanges[orderIndex-countRemoved].first;
+        
+        } else
+            outRanges[orderIndex-countRemoved]=inRanges[lowestRangeIndex];
+            
+        lastRangeEnd=outRanges[orderIndex-countRemoved].first+outRanges[orderIndex-countRemoved].count;
+        rangeUsed[lowestRangeIndex]=TRUE;
+    }
+
+    free(rangeUsed);
+    
+    return countRanges-countRemoved;
+}
+
 // Public functions
 
 size_t CoinSparkScriptToMetadata(const char* scriptPubKey, const size_t scriptPubKeyLen, const bool scriptIsHex,
@@ -1370,7 +1446,9 @@ bool CoinSparkAddressToString(const CoinSparkAddress* address, char* string, con
 
     FlagToString flagsToStrings[]={
         { COINSPARK_ADDRESS_FLAG_ASSETS, "assets" },
-        { COINSPARK_ADDRESS_FLAG_PAYMENT_REFS, "payment references" }
+        { COINSPARK_ADDRESS_FLAG_PAYMENT_REFS, "payment references" },
+        { COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES, "text messages" },
+        { COINSPARK_ADDRESS_FLAG_FILE_MESSAGES, "file messages" }
     };
     
     bufferPtr=buffer;
@@ -1766,7 +1844,7 @@ CoinSparkAssetQty CoinSparkGenesisCalcGross(const CoinSparkGenesis *genesis, Coi
     return (CoinSparkGenesisCalcNet(genesis, lowerGross)>=qtyNet) ? lowerGross : (lowerGross+1);
 }
 
-size_t CoinSparkGenesisCalcHashLen(CoinSparkGenesis *genesis, const size_t metadataMaxLen)
+size_t CoinSparkGenesisCalcHashLen(const CoinSparkGenesis *genesis, const size_t metadataMaxLen)
 {
     size_t domainPathLen;
     int assetHashLen;
@@ -2326,8 +2404,8 @@ static size_t CoinSparkTransferEncode(const CoinSparkTransfer* transfer, const C
     
 //  Packing for input and output indices
     
-    GetPackingOptions(previousTransfer ? &previousTransfer->inputs : NULL, &transfer->inputs, countInputs, inputPackingOptions);
-    GetPackingOptions(previousTransfer ? &previousTransfer->outputs : NULL, &transfer->outputs, countOutputs, outputPackingOptions);
+    GetPackingOptions(previousTransfer ? &previousTransfer->inputs : NULL, &transfer->inputs, countInputs, inputPackingOptions, FALSE);
+    GetPackingOptions(previousTransfer ? &previousTransfer->outputs : NULL, &transfer->outputs, countOutputs, outputPackingOptions, FALSE);
     
     if (inputPackingOptions[_0P] && outputPackingOptions[_0P])
         packing|=COINSPARK_PACKING_INDICES_0P_0P;
@@ -2512,10 +2590,10 @@ static size_t CoinSparkTransferDecode(const char* metadata, const size_t metadat
         else
             goto cannotDecodeTransfer;
     
-        if (!DecodePackingExtend((packingExtend>>COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK, &inputPackingType))
+        if (!DecodePackingExtend((packingExtend>>COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK, &inputPackingType, FALSE))
             goto cannotDecodeTransfer;
         
-        if (!DecodePackingExtend((packingExtend>>COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK, &outputPackingType))
+        if (!DecodePackingExtend((packingExtend>>COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK, &outputPackingType, FALSE))
             goto cannotDecodeTransfer;
         
     } else { // not using second packing metadata byte
@@ -2936,6 +3014,409 @@ bool CoinSparkPaymentRefDecode(CoinSparkPaymentRef* paymentRef, const char* meta
     return FALSE;
 }
 
+void CoinSparkMessageClear(CoinSparkMessage* message)
+{
+    message->useHttps=FALSE;
+    message->serverHost[0]=0x00;
+    message->usePrefix=FALSE;
+    message->serverPath[0]=0x00;
+    message->isPublic=FALSE;
+    message->countOutputRanges=0;
+    message->hashLen=0;
+}
+
+bool CoinSparkMessageToString(const CoinSparkMessage* message, char* string, const size_t stringMaxLen)
+{
+    char buffer[4096], urlString[256], hex1[128], hex2[128], *bufferPtr;
+    size_t bufferLength, copyLength, hostPathEncodeLen;
+    char hostPathMetadata[64];
+    int outputRangeIndex;
+    const CoinSparkIORange *outputRange;
+    
+    bufferPtr=buffer;
+    
+    hostPathEncodeLen=EncodeDomainAndOrPath(message->serverHost, message->useHttps, message->serverPath, message->usePrefix,
+                                            hostPathMetadata, hostPathMetadata+sizeof(hostPathMetadata));
+    CoinSparkMessageCalcServerURL(message, urlString, sizeof(urlString));
+    
+    bufferPtr+=sprintf(bufferPtr, "COINSPARK MESSAGE\n");
+    bufferPtr+=sprintf(bufferPtr, "    Server URL: %s (length %zd+%zd encoded %s length %zd)\n",
+        urlString, strlen(message->serverHost), strlen(message->serverPath),
+        BinaryToHex(hostPathMetadata, hostPathEncodeLen, hex1), hostPathEncodeLen);
+    bufferPtr+=sprintf(bufferPtr, "Public message: %s\n", message->isPublic ? "yes" : "no");
+    
+    for (outputRangeIndex=0; outputRangeIndex<message->countOutputRanges; outputRangeIndex++) {
+        outputRange=message->outputRanges+outputRangeIndex;
+        
+    	if (outputRange->count>0) {
+			if (outputRange->count>1)
+				bufferPtr+=sprintf(bufferPtr, "       Outputs: %d - %d (count %d)", outputRange->first,
+								   outputRange->first+outputRange->count-1, outputRange->count);
+			else
+				bufferPtr+=sprintf(bufferPtr, "        Output: %d", outputRange->first);
+		} else
+			bufferPtr+=sprintf(bufferPtr, "       Outputs: none");
+        
+        bufferPtr+=sprintf(bufferPtr, " (small endian hex: first %s count %s)\n", UnsignedToSmallEndianHex(outputRange->first, 2, hex1), UnsignedToSmallEndianHex(outputRange->count, 2, hex2));
+    }
+    
+    bufferPtr+=sprintf(bufferPtr, "  Message hash: %s (length %zd)\n", BinaryToHex(message->hash, message->hashLen, hex1), message->hashLen);
+    bufferPtr+=sprintf(bufferPtr, "END COINSPARK MESSAGE\n\n");
+
+    bufferLength=bufferPtr-buffer;
+    copyLength=COINSPARK_MIN(bufferLength, stringMaxLen-1);
+    memcpy(string, buffer, copyLength);
+    string[copyLength]=0x00;
+    
+    return (copyLength==bufferLength);
+}
+
+bool CoinSparkMessageIsValid(const CoinSparkMessage* message)
+{
+    int outputRangeIndex;
+    const CoinSparkIORange *outputRange;
+    
+    if (strlen(message->serverHost)>COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN)
+        goto messageIsInvalid;
+    
+    if (strlen(message->serverPath)>COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN)
+        goto messageIsInvalid;
+    
+    if ( (message->hashLen<COINSPARK_MESSAGE_HASH_MIN_LEN) || (message->hashLen>COINSPARK_MESSAGE_HASH_MAX_LEN) )
+        goto messageIsInvalid;
+
+    if ( (!message->isPublic) && (message->countOutputRanges<1) ) // public or aimed at some outputs at least
+        goto messageIsInvalid;
+    
+    if ( (message->countOutputRanges<0) || (message->countOutputRanges>COINSPARK_MESSAGE_MAX_IO_RANGES) )
+        goto messageIsInvalid;
+    
+    for (outputRangeIndex=0; outputRangeIndex<message->countOutputRanges; outputRangeIndex++) {
+        outputRange=message->outputRanges+outputRangeIndex;
+        
+        if ( (outputRange->first<0) || (outputRange->first>COINSPARK_IO_INDEX_MAX) )
+            goto messageIsInvalid;
+        
+        if ( (outputRange->count<0) || (outputRange->count>COINSPARK_IO_INDEX_MAX) )
+            goto messageIsInvalid;
+    }
+    
+    return TRUE;
+    
+    messageIsInvalid:
+    return FALSE;
+}
+
+bool CoinSparkMessageMatch(const CoinSparkMessage* message1, const CoinSparkMessage* message2, const bool strict)
+{
+    size_t hashCompareLen;
+    int compareRangeIndex, countCompareRanges1, countCompareRanges2;
+    CoinSparkIORange *normalizedRanges1, *normalizedRanges2;
+    const CoinSparkIORange *compareRanges1, *compareRanges2;
+    bool outputRangesMatch;
+
+    hashCompareLen=COINSPARK_MIN(message1->hashLen, message2->hashLen);
+    hashCompareLen=COINSPARK_MIN(hashCompareLen, COINSPARK_MESSAGE_HASH_MAX_LEN);
+    
+    if (strict) {
+        compareRanges1=message1->outputRanges;
+        compareRanges2=message2->outputRanges;
+        
+        countCompareRanges1=message1->countOutputRanges;
+        countCompareRanges2=message2->countOutputRanges;
+        
+    } else {
+        compareRanges1=normalizedRanges1=(CoinSparkIORange*)malloc(message1->countOutputRanges*sizeof(*normalizedRanges1));
+        compareRanges2=normalizedRanges2=(CoinSparkIORange*)malloc(message2->countOutputRanges*sizeof(*normalizedRanges2));
+        
+        countCompareRanges1=NormalizeIORanges(message1->outputRanges, normalizedRanges1, message1->countOutputRanges);
+        countCompareRanges2=NormalizeIORanges(message2->outputRanges, normalizedRanges2, message2->countOutputRanges);
+    }
+    
+    outputRangesMatch=(countCompareRanges1==countCompareRanges2);
+    
+    if (outputRangesMatch)
+        for (compareRangeIndex=0; compareRangeIndex<countCompareRanges1; compareRangeIndex++)
+            if ((compareRanges1[compareRangeIndex].first!=compareRanges2[compareRangeIndex].first) ||
+                (compareRanges1[compareRangeIndex].count!=compareRanges2[compareRangeIndex].count)) {
+                outputRangesMatch=FALSE;
+                break;
+            }
+    
+    if (!strict) {
+        free(normalizedRanges1);
+        free(normalizedRanges2);
+    }
+
+    return outputRangesMatch && (message1->useHttps==message2->useHttps) &&
+        (!strcasecmp(message1->serverHost, message2->serverHost)) &&
+        (message1->usePrefix==message2->usePrefix) &&
+        (!strcasecmp(message1->serverPath, message2->serverPath)) &&
+        (message1->isPublic==message2->isPublic) &&
+        (!memcmp(&message1->hash, &message2->hash, hashCompareLen));
+    
+}
+
+size_t CoinSparkMessageEncode(const CoinSparkMessage* message, const int countOutputs, char* metadata, const size_t metadataMaxLen)
+{
+    char* metadataPtr, *metadataEnd;
+    size_t encodeLen, firstBytes, countBytes;
+    char packing;
+    int outputRangeIndex;
+    const CoinSparkIORange *outputRange;
+    
+    if (!CoinSparkMessageIsValid(message))
+        goto cannotEncodeMessage;
+    
+    metadataPtr=metadata;
+    metadataEnd=metadataPtr+metadataMaxLen;
+
+//  4-character identifier
+    
+    if ((metadataPtr+COINSPARK_METADATA_IDENTIFIER_LEN+1)<=metadataEnd) {
+        memcpy(metadataPtr, COINSPARK_METADATA_IDENTIFIER, COINSPARK_METADATA_IDENTIFIER_LEN);
+        metadataPtr+=COINSPARK_METADATA_IDENTIFIER_LEN;
+        *metadataPtr++=COINSPARK_MESSAGE_PREFIX;
+    } else
+        goto cannotEncodeMessage;
+
+//  Server host and path
+    
+    encodeLen=EncodeDomainAndOrPath(message->serverHost, message->useHttps, message->serverPath, message->usePrefix, metadataPtr, metadataEnd);
+    if (!encodeLen)
+        goto cannotEncodeMessage;
+    
+    metadataPtr+=encodeLen;
+    
+//  Output ranges
+    
+    if (message->isPublic) { // add public indicator first
+        packing=((message->countOutputRanges>0) ? COINSPARK_OUTPUTS_MORE_FLAG : 0)|COINSPARK_OUTPUTS_TYPE_EXTEND|COINSPARK_PACKING_EXTEND_PUBLIC;
+        
+        if (metadataPtr<metadataEnd)
+            *metadataPtr++=packing;
+        else
+            goto cannotEncodeMessage;
+    }
+    
+    for (outputRangeIndex=0; outputRangeIndex<message->countOutputRanges; outputRangeIndex++) { // other output ranges
+        outputRange=message->outputRanges+outputRangeIndex;
+        
+        if (!GetMessageOutputRangePacking(outputRange, countOutputs, &packing, &firstBytes, &countBytes))
+            goto cannotEncodeMessage;
+        
+    //  The packing byte
+        
+        if ((outputRangeIndex+1)<message->countOutputRanges)
+            packing|=COINSPARK_OUTPUTS_MORE_FLAG;
+
+        if (metadataPtr<metadataEnd)
+            *metadataPtr++=packing;
+        else
+            goto cannotEncodeMessage;
+        
+    //  The index of the first output, if necessary
+        
+        if (firstBytes>0) {
+            if ((metadataPtr+firstBytes)<=metadataEnd) {
+                if (!WriteSmallEndianUnsigned(outputRange->first, metadataPtr, firstBytes))
+                    goto cannotEncodeMessage;
+                metadataPtr+=firstBytes;
+            } else
+                goto cannotEncodeMessage;
+        }
+        
+    //  The number of outputs, if necessary
+        
+        if (countBytes>0) {
+            if ((metadataPtr+countBytes)<=metadataEnd) {
+                if (!WriteSmallEndianUnsigned(outputRange->count, metadataPtr, countBytes))
+                    goto cannotEncodeMessage;
+                metadataPtr+=countBytes;
+            } else
+                goto cannotEncodeMessage;
+        }
+    }
+
+//  Message hash
+
+    if ((metadataPtr+message->hashLen)<=metadataEnd) {
+        memcpy(metadataPtr, message->hash, message->hashLen);
+        metadataPtr+=message->hashLen;
+    } else
+        goto cannotEncodeMessage;
+ 
+//  Return the number of bytes used
+    
+    return metadataPtr-metadata;
+    
+    cannotEncodeMessage:
+    return 0;
+}
+
+bool CoinSparkMessageDecode(CoinSparkMessage* message, const int countOutputs, const char* metadata, const size_t metadataLen)
+{
+    const char *metadataPtr, *metadataEnd;
+    size_t decodeLen, firstBytes, countBytes;
+    char packing, packingType, packingValue;
+    CoinSparkIORange *outputRange;
+    PackingType extendPackingType;
+    
+    metadataPtr=metadata;
+    metadataEnd=metadataPtr+metadataLen;
+    
+    if (!LocateMetadataRange(&metadataPtr, &metadataEnd, COINSPARK_MESSAGE_PREFIX))
+        goto cannotDecodeMessage;
+
+//  Server host and path
+    
+    decodeLen=DecodeDomainAndOrPath(metadataPtr, metadataEnd, message->serverHost, sizeof(message->serverHost),
+                                    &message->useHttps, message->serverPath, sizeof(message->serverPath), &message->usePrefix);
+    
+    if (!decodeLen)
+        goto cannotDecodeMessage;
+    
+    metadataPtr+=decodeLen;
+    
+//  Output ranges
+    
+    message->isPublic=FALSE;
+    message->countOutputRanges=0;
+    
+    do {
+        
+    //  Read the next packing byte and check reserved bits are zero
+        
+        if (metadataPtr<metadataEnd)
+            packing=*metadataPtr++;
+        else
+            goto cannotDecodeMessage;
+     
+        if (packing&COINSPARK_OUTPUTS_RESERVED_MASK)
+            goto cannotDecodeMessage;
+        
+        packingType=packing & COINSPARK_OUTPUTS_TYPE_MASK;
+        packingValue=packing & COINSPARK_OUTPUTS_VALUE_MASK;
+        
+        if ((packingType==COINSPARK_OUTPUTS_TYPE_EXTEND) && (packingValue==COINSPARK_PACKING_EXTEND_PUBLIC))
+            message->isPublic=TRUE; // special case for public messages
+        
+        else {
+        
+        //  Create a new output range
+            
+            if (message->countOutputRanges>=COINSPARK_MESSAGE_MAX_IO_RANGES) // too many output ranges
+                goto cannotDecodeMessage;
+            
+            outputRange=message->outputRanges+message->countOutputRanges;
+            message->countOutputRanges++;
+            
+            firstBytes=0;
+            countBytes=0;
+            
+        //  Decode packing byte
+            
+            if (packingType==COINSPARK_OUTPUTS_TYPE_SINGLE) { // inline single input
+                outputRange->first=packingValue;
+                outputRange->count=1;
+           
+            } else if (packingType==COINSPARK_OUTPUTS_TYPE_FIRST) { // inline first few outputs
+                outputRange->first=0;
+                outputRange->count=packingValue;
+                
+            } else if (packingType==COINSPARK_OUTPUTS_TYPE_EXTEND) { // we'll be taking additional bytes
+                if (!DecodePackingExtend(packingValue, &extendPackingType, TRUE))
+                    goto cannotDecodeMessage;
+                
+                PackingTypeToValues(extendPackingType, NULL, countOutputs, outputRange);
+                PackingExtendAddByteCounts(packingValue, &firstBytes, &countBytes);
+                
+            } else
+                goto cannotDecodeMessage; // will be COINSPARK_OUTPUTS_TYPE_UNUSED
+            
+        //  The index of the first output, if necessary
+            
+            if (firstBytes>0) {
+                if ((metadataPtr+firstBytes)<=metadataEnd) {
+                    outputRange->first=(CoinSparkIOIndex)ReadSmallEndianUnsigned(metadataPtr, firstBytes);
+                    metadataPtr+=firstBytes;
+                } else
+                    goto cannotDecodeMessage;
+            }
+            
+        //  The number of outputs, if necessary
+            
+            if (countBytes>0) {
+                if ((metadataPtr+countBytes)<=metadataEnd) {
+                    outputRange->count=(CoinSparkIOIndex)ReadSmallEndianUnsigned(metadataPtr, countBytes);
+                    metadataPtr+=countBytes;
+                } else
+                    goto cannotDecodeMessage;
+            }
+        }
+        
+    } while
+        (packing&COINSPARK_OUTPUTS_MORE_FLAG);
+    
+//  Message hash
+    
+    message->hashLen=COINSPARK_MIN(metadataEnd-metadataPtr, COINSPARK_MESSAGE_HASH_MAX_LEN); // apply maximum
+    memcpy(message->hash, metadataPtr, message->hashLen);
+    metadataPtr+=message->hashLen;
+
+//  Return validity
+    
+    return CoinSparkMessageIsValid(message);
+    
+    cannotDecodeMessage:
+    return FALSE;
+}
+
+bool CoinSparkMessageHasOutput(const CoinSparkMessage* message, int outputIndex)
+{
+    int outputRangeIndex;
+    const CoinSparkIORange *outputRange;
+    
+    for (outputRangeIndex=0; outputRangeIndex<message->countOutputRanges; outputRangeIndex++) {
+        outputRange=message->outputRanges+outputRangeIndex;
+        
+        if ( (outputIndex>=outputRange->first) && (outputIndex<(outputRange->first+outputRange->count)) )
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+size_t CoinSparkMessageCalcHashLen(const CoinSparkMessage *message, int countOutputs, const size_t metadataMaxLen)
+{
+    size_t hostPathLen, firstBytes, countBytes;
+    int hashLen, outputRangeIndex;
+    u_int8_t octets[4];
+    char hostName[256], packing;
+    
+    hashLen=(int)metadataMaxLen-COINSPARK_METADATA_IDENTIFIER_LEN-1;
+    
+    hostPathLen=strlen(message->serverPath)+1;
+    
+    if (ReadIPv4Address(message->serverHost, octets))
+        hashLen-=5; // packing and IP octets
+    else {
+        hashLen-=1; // packing
+        hostPathLen+=ShrinkLowerDomainName(message->serverHost, strlen(message->serverHost), hostName, sizeof(hostName), &packing)+1;
+    }
+    
+    hashLen-=2*((hostPathLen+2)/3); // uses integer arithmetic
+    
+    if (message->isPublic)
+        hashLen--;
+    
+    for (outputRangeIndex=0; outputRangeIndex<message->countOutputRanges; outputRangeIndex++)// other output ranges
+        if (GetMessageOutputRangePacking(message->outputRanges+outputRangeIndex, countOutputs, &packing, &firstBytes, &countBytes))
+            hashLen-=(1+firstBytes+countBytes);
+    
+    return COINSPARK_MIN(COINSPARK_MAX(hashLen, 0), COINSPARK_MESSAGE_HASH_MAX_LEN);
+}
+
 size_t CoinSparkGenesisCalcAssetURL(const CoinSparkGenesis *genesis, const char* firstSpentTxID, const int firstSpentVout, char* urlString, const size_t urlStringMaxLen)
 {
     char firstSpentTxIdPart[17], fullURL[256];
@@ -2960,6 +3441,33 @@ size_t CoinSparkGenesisCalcAssetURL(const CoinSparkGenesis *genesis, const char*
         return 0;
 }
 
+size_t CoinSparkMessageCalcServerURL(const CoinSparkMessage* message, char* urlString, const size_t urlStringMaxLen)
+{
+    char fullURL[256];
+    int charIndex;
+    size_t fullURLLen;
+    
+    sprintf(fullURL, "%s://%s/%s%s%s", message->useHttps ? "https" : "http", message->serverHost, message->usePrefix ? "coinspark/" : "",
+            message->serverPath, message->serverPath[0] ? "/" : "");
+    fullURLLen=strlen(fullURL);
+
+    if (fullURLLen<urlStringMaxLen) { // allow for C null terminator
+        for (charIndex=0; charIndex<=fullURLLen; charIndex++)
+            urlString[charIndex]=tolower(fullURL[charIndex]);
+        
+        return fullURLLen;
+        
+    } else
+        return 0;
+}
+
+#define ADD_HASH_BUFFER_STRING(bufferPtr, string, stringLen) \
+    if ((string) && (stringLen)) { \
+        memcpy(bufferPtr, string, stringLen); \
+        (bufferPtr)+=(stringLen); \
+    } \
+    *(bufferPtr)++=0x00;
+    
 void CoinSparkCalcAssetHash(const char* name, size_t nameLen,
                             const char* issuer, size_t issuerLen,
                             const char* description, size_t descriptionLen,
@@ -2997,15 +3505,7 @@ void CoinSparkCalcAssetHash(const char* name, size_t nameLen,
                     keepTrimming=FALSE; \
                     break; \
             }
-    
-    
-    #define ADD_HASH_BUFFER_STRING(string, stringLen) \
-        if (string && stringLen) { \
-            memcpy(bufferPtr, string, stringLen); \
-            bufferPtr+=stringLen; \
-        } \
-        *bufferPtr++=0x00;
-    
+
     TRIM_STRING(name, nameLen);
     TRIM_STRING(issuer, issuerLen);
     TRIM_STRING(description, descriptionLen);
@@ -3013,12 +3513,12 @@ void CoinSparkCalcAssetHash(const char* name, size_t nameLen,
     TRIM_STRING(issueDate, issueDateLen);
     TRIM_STRING(expiryDate, expiryDateLen);
 
-    ADD_HASH_BUFFER_STRING(name, nameLen);
-    ADD_HASH_BUFFER_STRING(issuer, issuerLen);
-    ADD_HASH_BUFFER_STRING(description, descriptionLen);
-    ADD_HASH_BUFFER_STRING(units, unitsLen);
-    ADD_HASH_BUFFER_STRING(issueDate, issueDateLen);
-    ADD_HASH_BUFFER_STRING(expiryDate, expiryDateLen);
+    ADD_HASH_BUFFER_STRING(bufferPtr, name, nameLen);
+    ADD_HASH_BUFFER_STRING(bufferPtr, issuer, issuerLen);
+    ADD_HASH_BUFFER_STRING(bufferPtr, description, descriptionLen);
+    ADD_HASH_BUFFER_STRING(bufferPtr, units, unitsLen);
+    ADD_HASH_BUFFER_STRING(bufferPtr, issueDate, issueDateLen);
+    ADD_HASH_BUFFER_STRING(bufferPtr, expiryDate, expiryDateLen);
     
     interestRateToHash=(long long)((interestRate ? *interestRate : 0)*1000000.0+0.5);
     multipleToHash=(long long)((multiple ? *multiple : 1)*1000000.0+0.5);
@@ -3026,9 +3526,37 @@ void CoinSparkCalcAssetHash(const char* name, size_t nameLen,
     bufferPtr+=1+sprintf(bufferPtr, "%lld", (long long)interestRateToHash);
     bufferPtr+=1+sprintf(bufferPtr, "%lld", (long long)multipleToHash);
     
-    ADD_HASH_BUFFER_STRING(contractContent, contractContentLen);
+    ADD_HASH_BUFFER_STRING(bufferPtr, contractContent, contractContentLen);
     
     CoinSparkCalcSHA256Hash((unsigned char*)buffer, bufferPtr-buffer, assetHash);
+    
+    free(buffer);
+}
+
+void CoinSparkCalcMessageHash(const char* salt, size_t saltLen, const CoinSparkMessagePart* messageParts,
+                              const int countParts, unsigned char messageHash[32])
+{
+    size_t bufferLen;
+    int partIndex;
+    char *buffer, *bufferPtr;
+    
+    bufferLen=saltLen+16;
+    for (partIndex=0; partIndex<countParts; partIndex++)
+        bufferLen+=messageParts[partIndex].mimeTypeLen+messageParts[partIndex].contentLen+
+            (messageParts[partIndex].fileName ? messageParts[partIndex].fileNameLen : 0)+16;
+    
+    buffer=malloc(bufferLen);
+    bufferPtr=buffer;
+    
+    ADD_HASH_BUFFER_STRING(bufferPtr, salt, saltLen);
+    
+    for (partIndex=0; partIndex<countParts; partIndex++) {
+        ADD_HASH_BUFFER_STRING(bufferPtr, messageParts[partIndex].mimeType, messageParts[partIndex].mimeTypeLen);
+        ADD_HASH_BUFFER_STRING(bufferPtr, messageParts[partIndex].fileName, messageParts[partIndex].fileNameLen);
+        ADD_HASH_BUFFER_STRING(bufferPtr,messageParts[partIndex].content, messageParts[partIndex].contentLen);
+    }
+    
+    CoinSparkCalcSHA256Hash((unsigned char*)buffer, bufferPtr-buffer, messageHash);
     
     free(buffer);
 }
@@ -3057,6 +3585,7 @@ char* CoinSparkGetGenesisWebPageURL(const char* scriptPubKeys[], const size_t sc
     returnWebPageURL:
     return webPageURL; // called must call free() on the result but anyway this is for contract only
 }
+
 
 CoinSparkAssetQty CoinSparkGetGenesisOutputQty(const char* scriptPubKeys[], const size_t scriptPubKeysLen[],
                                                const CoinSparkSatoshiQty* outputsSatoshis, const int countOutputs,
