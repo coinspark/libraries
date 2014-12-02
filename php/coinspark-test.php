@@ -36,28 +36,8 @@
 		ProcessInputContents($inputSource);
 		fclose($inputSource);
 
-	} else {
+	} else
 		echo "No CoinSpark test input file was specified\n\n";
-		
-		/* Little test for random payment ref generation - not part of official suite
-		
-		$paymentRef=new CoinSparkPaymentRef();
-		for ($randomize=0; $randomize<10000; $randomize++) {
-			$paymentRef->randomize();
-			$testRef=$paymentRef->ref;
-			
-			for ($bit=(COINSPARK_PAYMENT_REF_MAX+1)/2; $bit>0; $bit=floor($bit/2)) {
-				if ($testRef>=$bit) {
-					echo 1;
-					$testRef-=$bit;
-				} else
-					echo 0;
-			}
-			
-			echo sprintf(" %.0f\n", $paymentRef->ref);;
-		}
-		*/
-	}
  
 
 	function GetNextInputLine($inputSource)
@@ -110,8 +90,8 @@
 				ProcessScriptTests($inputSource);
 				break;
 				
-			case 'CoinSpark Hash Tests Input':
-				ProcessHashTests($inputSource);
+			case 'CoinSpark AssetHash Tests Input':
+				ProcessAssetHashTests($inputSource);
 				break;
 				
 			case 'CoinSpark Genesis Tests Input':
@@ -120,6 +100,10 @@
 				
 			case 'CoinSpark Transfer Tests Input':
 				ProcessTransferTests($inputSource);
+				break;
+				
+			case 'CoinSpark MessageHash Tests Input':
+				ProcessMessageHashTests($inputSource);
 				break;
 		}
 	}
@@ -204,6 +188,9 @@
 			
 			$transfers=new CoinSparkTransferList();
 			$hasTransfers=$transfers->decode($metadata, $countInputs, $countOutputs);
+			
+			$message=new CoinSparkMessage();
+			$hasMessage=$message->decode($metadata, $countOutputs);
 		
 		//	Output the toString()s
 			
@@ -215,6 +202,9 @@
 				
 			if ($hasTransfers)
 				echo $transfers->toString();
+				
+			if ($hasMessage)
+				echo $message->toString();
 		
 		//	Re-encode
 		
@@ -222,7 +212,7 @@
 			$testMetadataMaxLen=strlen($metadata);
 			$nextMetadataMaxLen=$testMetadataMaxLen;
 			
-			$encodeOrder=array('genesis', 'paymentRef', 'transfers');
+			$encodeOrder=array('genesis', 'paymentRef', 'transfers', 'message');
 			
 			foreach ($encodeOrder as $encodeField) {
 				$triedNextMetadata=false;
@@ -245,6 +235,13 @@
 					case 'transfers':
 						if ($hasTransfers) {
 							$nextMetadata=$transfers->encode($countInputs, $countOutputs, $nextMetadataMaxLen);
+							$triedNextMetadata=true;
+						}
+						break;
+						
+					case 'message':
+						if ($hasMessage) {
+							$nextMetadata=$message->encode($countOutputs, $nextMetadataMaxLen);
 							$triedNextMetadata=true;
 						}
 						break;
@@ -302,6 +299,14 @@
 					die("Failed to leniently match transfers to itself!\n");
 			}
 			
+			if ($hasMessage) {
+				if (!$message->match($message, true))
+					die("Failed to strictly match message to itself!\n");
+
+				if (!$message->match($message, false))
+					die("Failed to leniently match message to itself!\n");
+			}
+			
 		//	Compare to the original
 			
 			$encoded=CoinSparkMetadataToScript($testMetadata, true);
@@ -317,9 +322,9 @@
 	}
 	
 	
-	function ProcessHashTests($inputSource)
+	function ProcessAssetHashTests($inputSource)
 	{
-		echo "CoinSpark Hash Tests Output\n\n";
+		echo "CoinSpark AssetHash Tests Output\n\n";
 		
 		while (true) {
 			$inputLines=GetNextInputLines($inputSource, 10);
@@ -441,4 +446,36 @@
 					die(sprintf("Net to gross to net mismatch: %.0f -> %.0f -> %.0f!\n", $inputBalance, $testGrossBalance, $testNetBalance));
 			}
 		}
+	}
+	
+	
+	function ProcessMessageHashTests($inputSource)
+	{
+		echo "CoinSpark MessageHash Tests Output\n\n";
+		
+		while (true) {
+			$inputLines=GetNextInputLines($inputSource, 2);
+			if (!isset($inputLines))
+				break;
+				
+			list($salt, $countParts)=$inputLines;
+			
+			$inputLines=GetNextInputLines($inputSource, 3*$countParts+1);
+			if (!isset($inputLines))
+				break;
+				
+			$messageParts=array();
+			while ((count($messageParts)<$countParts) && count($inputLines))
+				$messageParts[]=array(
+					'mimeType' => array_shift($inputLines),
+					'fileName' => array_shift($inputLines),
+					'content' => array_shift($inputLines),
+				);
+			
+			$hash=CoinSparkCalcMessageHash($salt, $messageParts);
+			
+			echo strtoupper(bin2hex($hash))."\n";
+		}
+
+	
 	}

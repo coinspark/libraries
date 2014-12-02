@@ -363,6 +363,16 @@
 		return hash('sha256', $buffer, true);
 	}
 	
+	function CoinSparkCalcMessageHash($salt, $messageParts)
+	{
+		$buffer=$salt."\x00";
+		
+		foreach ($messageParts as $messagePart)
+			$buffer.=$messagePart['mimeType']."\x00".@$messagePart['fileName']."\x00".$messagePart['content']."\x00";
+			
+		return hash('sha256', $buffer, true);
+	}
+	
 
 //	CoinSparkAddress class for managing CoinSpark addresseses
 
@@ -2057,7 +2067,7 @@
 			$urlString=$this->calcServerUrl();
 			
 			$buffer="COINSPARK MESSAGE\n";
-			$buffer.=sprintf("    Server URL: %s (length %zd+%zd encoded %s length %zd)\n", $urlString,
+			$buffer.=sprintf("    Server URL: %s (length %d+%d encoded %s length %d)\n", $urlString,
 				strlen($this->serverHost), strlen($this->serverPath), strtoupper(bin2hex($hostPathMetadata)), strlen($hostPathMetadata));
 			$buffer.=sprintf("Public message: %s\n", $this->isPublic ? "yes" : "no");
 			
@@ -2107,10 +2117,10 @@
 			if ( ($this->hashLen<COINSPARK_MESSAGE_HASH_MIN_LEN) || ($this->hashLen>COINSPARK_MESSAGE_HASH_MAX_LEN) )
 				return false;
 
-			if ( (!$this->isPublic) && ($this->countOutputRanges<1) ) // public or aimed at some outputs at least
+			if ( (!$this->isPublic) && (count($this->outputRanges)==0) ) // public or aimed at some outputs at least
 				return false;
 	
-			if ( ($this->countOutputRanges<0) || ($this->countOutputRanges>COINSPARK_MESSAGE_MAX_IO_RANGES) )
+			if (count($this->outputRanges)>COINSPARK_MESSAGE_MAX_IO_RANGES)
 				return false;
 	
 			foreach ($this->outputRanges as $outputRange)
@@ -2159,7 +2169,7 @@
 	
 		//  Server host and path
 			
-			$written-$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix);
+			$written=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix);
 			if (!isset($written))
 				return null;
 	
@@ -2221,7 +2231,7 @@
 			$metadata=CoinSparkLocateMetadataRange($metadata, COINSPARK_MESSAGE_PREFIX);
 			if (!isset($metadata))
 				return 0;
-
+				
 		//  Server host and path
 			
 			$decodedHostPath=$this->shiftDecodeDomainAndOrPath($metadata, true, true);
@@ -2296,6 +2306,9 @@
 					if (!$this->shiftReadUnsignedField($metadata, $countBytes, $outputRange->count))
 						return false;
 					
+				//	Add on the new output range
+				
+					$this->outputRanges[]=$outputRange;
 				}
 		
 			} while
@@ -2366,7 +2379,7 @@
 			if ($packingOptions['_1_0_BYTE'] && ($outputRange->first<=self::COINSPARK_OUTPUTS_VALUE_MAX)) // inline single output
 				$packing=self::COINSPARK_OUTPUTS_TYPE_SINGLE | ($outputRange->first & self::COINSPARK_OUTPUTS_VALUE_MASK);
 	
-			elseif ($packingOptions['_0_1_BYTE'] && ($outputRange->count<=COINSPARK_OUTPUTS_VALUE_MAX)) // inline first few outputs
+			elseif ($packingOptions['_0_1_BYTE'] && ($outputRange->count<=self::COINSPARK_OUTPUTS_VALUE_MAX)) // inline first few outputs
 				$packing=self::COINSPARK_OUTPUTS_TYPE_FIRST | ($outputRange->count & self::COINSPARK_OUTPUTS_VALUE_MASK);
 	
 			else { // we'll be taking additional bytes
@@ -2868,6 +2881,9 @@
 		protected function normalizeIORanges($inRanges)
 		{
 			$countRanges=count($inRanges);
+			if ($countRanges==0)
+				return $inRanges;
+				
 			$rangeUsed=array_fill(0, $countRanges, false);
 			$outRanges=array();
 			$countRemoved=0;
@@ -2936,7 +2952,7 @@
 			return $packingOptions;
 		}
 		
-		private function packingTypeToValues($packingType, $previousRange, $countInputOutputs)
+		protected function packingTypeToValues($packingType, $previousRange, $countInputOutputs)
 		{
 			$range=new CoinSparkIORange();
 			
