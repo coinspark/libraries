@@ -414,6 +414,8 @@
 			$flagsToStrings=array(
 				COINSPARK_ADDRESS_FLAG_ASSETS => "assets",
 				COINSPARK_ADDRESS_FLAG_PAYMENT_REFS => "payment references",
+				COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES => "text messages",
+				COINSPARK_ADDRESS_FLAG_FILE_MESSAGES => "file messages",
 			);
 			
 			$buffer="COINSPARK ADDRESS\n";
