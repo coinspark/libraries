@@ -52,18 +52,20 @@ cd CoinSpark-Tests-*
 php ../php/coinspark-test.php Address-Input.txt > Address-Output-PHP.txt
 php ../php/coinspark-test.php AssetRef-Input.txt > AssetRef-Output-PHP.txt
 php ../php/coinspark-test.php Script-Input.txt > Script-Output-PHP.txt
-php ../php/coinspark-test.php Hash-Input.txt > Hash-Output-PHP.txt
+php ../php/coinspark-test.php AssetHash-Input.txt > AssetHash-Output-PHP.txt
 php ../php/coinspark-test.php Genesis-Input.txt > Genesis-Output-PHP.txt
 php ../php/coinspark-test.php Transfer-Input.txt > Transfer-Output-PHP.txt
+php ../php/coinspark-test.php MessageHash-Input.txt > MessageHash-Output-PHP.txt
 
 * Now check the corresponding PHP and C output files for differences
 
 diff Address-Output-C.txt Address-Output-PHP.txt
 diff AssetRef-Output-C.txt AssetRef-Output-PHP.txt
 diff Script-Output-C.txt Script-Output-PHP.txt
-diff Hash-Output-C.txt Hash-Output-PHP.txt
+diff AssetHash-Output-C.txt AssetHash-Output-PHP.txt
 diff Genesis-Output-C.txt Genesis-Output-PHP.txt
 diff Transfer-Output-C.txt Transfer-Output-PHP.txt
+diff MessageHash-Output-C.txt MessageHash-Output-PHP.txt
 
 * If no differences were reported, the library has passed the C-PHP consistency test.
 
@@ -74,7 +76,7 @@ diff Transfer-Output-C.txt Transfer-Output-PHP.txt
 python ../python/coinspark-test.py Address-Input.txt > Address-Output-Python.txt
 python ../python/coinspark-test.py AssetRef-Input.txt > AssetRef-Output-Python.txt
 python ../python/coinspark-test.py Script-Input.txt > Script-Output-Python.txt
-python ../python/coinspark-test.py Hash-Input.txt > Hash-Output-Python.txt
+python ../python/coinspark-test.py AssetHash-Input.txt > AssetHash-Output-Python.txt
 python ../python/coinspark-test.py Genesis-Input.txt > Genesis-Output-Python.txt
 python ../python/coinspark-test.py Transfer-Input.txt > Transfer-Output-Python.txt
 
@@ -83,7 +85,7 @@ python ../python/coinspark-test.py Transfer-Input.txt > Transfer-Output-Python.t
 diff Address-Output-C.txt Address-Output-Python.txt
 diff AssetRef-Output-C.txt AssetRef-Output-Python.txt
 diff Script-Output-C.txt Script-Output-Python.txt
-diff Hash-Output-C.txt Hash-Output-Python.txt
+diff AssetHash-Output-C.txt AssetHash-Output-Python.txt
 diff Genesis-Output-C.txt Genesis-Output-Python.txt
 diff Transfer-Output-C.txt Transfer-Output-Python.txt
 
@@ -102,7 +104,7 @@ java -classpath ../java/src/main/java/ org.coinspark.protocol.CoinSparkTest
 diff Address-Output-C.txt Address-Output-Java.txt
 diff AssetRef-Output-C.txt AssetRef-Output-Java.txt
 diff Script-Output-C.txt Script-Output-Java.txt
-diff Hash-Output-C.txt Hash-Output-Java.txt
+diff AssetHash-Output-C.txt AssetHash-Output-Java.txt
 diff Genesis-Output-C.txt Genesis-Output-Java.txt
 diff Transfer-Output-C.txt Transfer-Output-Java.txt
 
