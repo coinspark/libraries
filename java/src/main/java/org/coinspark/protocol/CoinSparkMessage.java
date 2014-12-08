@@ -27,7 +27,7 @@ package org.coinspark.protocol;
 import java.util.Arrays;
 
 /**
- * CoinSparkAddress class for managing CoinSpark messages
+ * CoinSparkMessage class for managing CoinSpark messages
  */
 
 
@@ -71,7 +71,7 @@ public class CoinSparkMessage extends CoinSparkBase{
      * @param Server to set
      */
     
-    public void ServerPath(String Server) {
+    public void setServerPath(String Server) {
         serverPath = Server;
     }
 
@@ -197,6 +197,25 @@ public class CoinSparkMessage extends CoinSparkBase{
         outputRanges=Arrays.copyOf(OutputRanges, countOutputRanges);
     }
     
+    /**
+     * Adds OutputRange to the list
+     * 
+     * @param OutputRange to add
+     */
+    
+    public void addOutputs(CoinSparkIORange OutputRange)
+    {
+        if (COINSPARK_MESSAGE_MAX_IO_RANGES > countOutputRanges)
+        {
+            outputRanges[countOutputRanges] = OutputRange;
+            countOutputRanges++;
+        }        
+    }
+    
+    /**
+     * CoinSparkMessage class for managing CoinSpark messages
+     */
+
     public CoinSparkMessage()
     {       
         clear();
@@ -432,7 +451,8 @@ public class CoinSparkMessage extends CoinSparkBase{
     }
     
     /**
-     * Content part subclass
+     * Content part subclass.
+     * 
      * All String parameters must be passed using UTF-8 encoding.
      */    
     
@@ -453,9 +473,9 @@ public class CoinSparkMessage extends CoinSparkBase{
     /**
      * Calculates the hash for the specific set of ContentParts
      * 
-     * @param salt - salt parameter
-     * @param messageParts - content parts to hash
-     * @return asset hash or null on failure
+     * @param salt  salt parameter
+     * @param messageParts content parts to hash
+     * @return message hash or null on failure
      */
     
     public static byte [] calcMessageHash(byte [] salt, ContentPart [] messageParts)
@@ -509,7 +529,7 @@ public class CoinSparkMessage extends CoinSparkBase{
     /**
      * Returns true if message has specified output in its ranges
      * 
-     * @param outputIndex - output index to check
+     * @param outputIndex output index to check
      * @return true if message has specified output in its ranges, false otherwise
      */
     
@@ -527,7 +547,7 @@ public class CoinSparkMessage extends CoinSparkBase{
      * Calculates the appropriate message hash length so that when encoded as metadata the genesis will
      * fit in metadataMaxLen bytes. For now, set metadataMaxLen to 40 (see Bitcoin's MAX_OP_RETURN_RELAY parameter).
      *
-     * @param metadataMaxLen - metadata maximal length
+     * @param metadataMaxLen metadata maximal length
      * @return asset hash length of message
      */
     
@@ -535,9 +555,9 @@ public class CoinSparkMessage extends CoinSparkBase{
      * Calculates the appropriate message hash length so that when encoded as metadata the genesis will
      * fit in metadataMaxLen bytes.For now, set metadataMaxLen to 40 (see Bitcoin's MAX_OP_RETURN_RELAY parameter).
      * 
-     * @param countOutputs - number of outputs in transaction
-     * @param metadataMaxLen - metadata maximal length
-     * @return asset hash length of message
+     * @param countOutputs number of outputs in transaction
+     * @param metadataMaxLen metadata maximal length
+     * @return hash length of the message
      */
     
     public int calcHashLen(int countOutputs, int metadataMaxLen)

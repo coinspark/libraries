@@ -39,6 +39,7 @@ import org.coinspark.protocol.CoinSparkAssetRef;
 import org.coinspark.protocol.CoinSparkBase;
 import org.coinspark.protocol.CoinSparkGenesis;
 import org.coinspark.protocol.CoinSparkIORange;
+import org.coinspark.protocol.CoinSparkMessage;
 import org.coinspark.protocol.CoinSparkPaymentRef;
 import org.coinspark.protocol.CoinSparkTransfer;
 import org.coinspark.protocol.CoinSparkTransferList;
@@ -230,6 +231,37 @@ public class CoinSparkSamples {
             ; // handle error
 
         return genesis;
+    }
+
+    public static CoinSparkMessage CreateMessage()
+    {
+        System.out.println("\nCreating and encoding message metadata...\n");
+
+        CoinSparkMessage message=new CoinSparkMessage();
+ 
+        message.setUseHttps(true);
+        message.setServerHost("123.45.67.89");
+        message.setUsePrefix(false);
+        message.setServerPath("msg");
+        message.setIsPublic(false);
+        message.addOutputs(new CoinSparkIORange(0, 2)); // message is for outputs 0 and 1
+ 
+        int countOutputs=3; // 3 outputs for this transaction
+        int hashLen=message.calcHashLen(countOutputs, 40); // 40 byte limit for OP_RETURN
+        message.setHashLen(hashLen);
+        byte[] hash = new byte [hashLen];       
+        Random rnd=new Random();       
+        rnd.nextBytes(hash); // random hash in example   
+        message.setHash(hash);
+
+        byte[] metadata=message.encode(countOutputs, 40); // 40 byte limit for OP_RETURNs
+
+        if (metadata!=null)
+            ; // use CoinSparkBase.metadataToScript() to embed metadata in an output script
+        else
+            ; // handle error
+        
+        return message;
     }
     
     public static CoinSparkTransferList CreateTransferList()
@@ -484,6 +516,8 @@ public class CoinSparkSamples {
 
         CoinSparkGenesis genesis=CreateGenesis();
 
+        CoinSparkMessage message=CreateMessage();
+        
         CoinSparkTransferList transferList=CreateTransferList();
 
         CoinSparkPaymentRef paymentRef=CreatePaymentRef();
