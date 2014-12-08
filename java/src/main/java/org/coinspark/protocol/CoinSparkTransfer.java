@@ -355,9 +355,9 @@ public class CoinSparkTransfer extends CoinSparkBase{
 
             //  Packing for input and output indices
             inputPackingOptions = CoinSparkPacking.getPackingOptions(previousTransfer != null ?
-                    previousTransfer.inputs : null, this.inputs, countInputs);
+                    previousTransfer.inputs : null, this.inputs, countInputs,false);
             outputPackingOptions = CoinSparkPacking.getPackingOptions(previousTransfer != null ?
-                    previousTransfer.outputs : null, this.outputs, countOutputs);
+                    previousTransfer.outputs : null, this.outputs, countOutputs,false);
 
             if (inputPackingOptions[CoinSparkPacking.PackingType._0P.getValue()] &&
                 outputPackingOptions[CoinSparkPacking.PackingType._0P.getValue()])
@@ -514,13 +514,13 @@ public class CoinSparkTransfer extends CoinSparkBase{
                     throw new CoinSparkExceptions.CannotDecode("Cannot read packing extend");
 
                 inputPackingType=CoinSparkPacking.decodePackingExtend((byte) ((packingExtend >> CoinSparkPacking.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) &
-                                CoinSparkPacking.COINSPARK_PACKING_EXTEND_MASK));
+                                CoinSparkPacking.COINSPARK_PACKING_EXTEND_MASK),false);
 
                 if (inputPackingType == CoinSparkPacking.PackingType._NONE)
                     throw new CoinSparkExceptions.CannotDecode("Wrong packing type");
                 
                 outputPackingType = CoinSparkPacking.decodePackingExtend((byte) ((packingExtend >> CoinSparkPacking.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) &
-                                CoinSparkPacking.COINSPARK_PACKING_EXTEND_MASK));
+                                CoinSparkPacking.COINSPARK_PACKING_EXTEND_MASK),false);
                 if (outputPackingType == CoinSparkPacking.PackingType._NONE)
                     throw new CoinSparkExceptions.CannotDecode("No packing type");
                 

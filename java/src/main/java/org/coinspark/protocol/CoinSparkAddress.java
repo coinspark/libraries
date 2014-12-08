@@ -46,6 +46,19 @@ public class CoinSparkAddress extends CoinSparkBase{
     public static final int  COINSPARK_ADDRESS_FLAG_PAYMENT_REFS    = 2;
 
     /**
+     * Address supports text messages if a (flags & COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES != 0)
+     */
+    
+    public static final int  COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES    = 4;
+    
+    /**
+     * Address supports file messages if a (flags & COINSPARK_ADDRESS_FLAG_FILE_MESSAGES != 0)
+     */
+    
+    public static final int  COINSPARK_ADDRESS_FLAG_FILE_MESSAGES    = 8;
+    
+    
+    /**
      * (flags & COINSPARK_ADDRESS_FLAG_MASK) is used 
      */
     
@@ -149,10 +162,12 @@ public class CoinSparkAddress extends CoinSparkBase{
     @Override
     public String toString()
     {
-        FlagToString[] flagsToStrings= new FlagToString[2];
+        FlagToString[] flagsToStrings= new FlagToString[4];
 
         flagsToStrings[0] = new FlagToString(COINSPARK_ADDRESS_FLAG_ASSETS, "assets");
         flagsToStrings[1] = new FlagToString(COINSPARK_ADDRESS_FLAG_PAYMENT_REFS, "payment references");
+        flagsToStrings[2] = new FlagToString(COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES, "text messages");
+        flagsToStrings[3] = new FlagToString(COINSPARK_ADDRESS_FLAG_FILE_MESSAGES, "file messages");
 
         StringBuilder sb = new StringBuilder();
         sb.append("COINSPARK ADDRESS\n")

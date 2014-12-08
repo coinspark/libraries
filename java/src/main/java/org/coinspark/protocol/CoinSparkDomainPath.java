@@ -33,7 +33,7 @@ import java.util.Arrays;
  * CoinSpark class for managing Asset web pages structures
  */
 
-public class CoinSparkAssetWebPage extends CoinSparkBase{
+public class CoinSparkDomainPath extends CoinSparkBase{
 
     /**
      * Doiman name (without scheme).
@@ -64,7 +64,7 @@ public class CoinSparkAssetWebPage extends CoinSparkBase{
      * CoinSpark class for managing Asset web pages structures
      */
     
-    protected CoinSparkAssetWebPage()
+    protected CoinSparkDomainPath()
     {
         
     }
@@ -78,7 +78,7 @@ public class CoinSparkAssetWebPage extends CoinSparkBase{
      * @param UsePrefix use "coinspark/" prefix
      */
     
-    protected CoinSparkAssetWebPage(String DomainName,String Path, boolean UseHttps, boolean UsePrefix)
+    protected CoinSparkDomainPath(String DomainName,String Path, boolean UseHttps, boolean UsePrefix)
     {
         domainName=DomainName;
         path=Path;
@@ -108,7 +108,7 @@ public class CoinSparkAssetWebPage extends CoinSparkBase{
      * @return Returns true if the two Asset web page structures are identical.
      */
     
-    protected boolean match(CoinSparkAssetWebPage page2)
+    protected boolean match(CoinSparkDomainPath page2)
     {
         return 
                 domainName.toLowerCase().equals(page2.domainName.toLowerCase()) && 

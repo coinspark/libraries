@@ -39,6 +39,7 @@ public class CoinSparkBase {
     protected static final byte COINSPARK_GENESIS_PREFIX  = 'g';
     protected static final byte COINSPARK_TRANSFERS_PREFIX = 't';
     protected static final byte COINSPARK_PAYMENTREF_PREFIX  = 'r';
+    protected static final byte COINSPARK_MESSAGE_PREFIX  = 'm';
     
     protected final static long COINSPARK_SATOSHI_QTY_MAX  = 2100000000000000L;
 
@@ -416,7 +417,6 @@ public class CoinSparkBase {
         return countOutputs; // indicates no regular ones were found
     }
 
-    
     protected class CoinSparkBuffer{
         
         private final static int BUFFER_ALLOC_LENGTH = 40;

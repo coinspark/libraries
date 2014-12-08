@@ -47,9 +47,10 @@ public class CoinSparkTest {
         ADDRESS("A","Addresses", "Address"),
         REFERENCE("R","Asset References", "AssetRef"),
         SCRIPT("S","Script metadata", "Script"),
-        HASH("H","Asset Hashes", "Hash"),
+        HASH("H","Asset Hashes", "AssetHash"),
         GENESIS("G","Genesis calculations", "Genesis"),
-        TRANSFER("T","Transfer calculations", "Transfer");
+        TRANSFER("T","Transfer calculations", "Transfer"),
+        MESSAGE("M","Message Hashes", "MessageHash");
         
         private String letter;
         private String text;
@@ -548,6 +549,9 @@ public class CoinSparkTest {
                 
                 CoinSparkTransferList transfers=new CoinSparkTransferList();
                 boolean hasTransferList=transfers.decode(metadata, countInputs, countOutputs);
+
+                CoinSparkMessage message=new CoinSparkMessage();
+                boolean hasMessage=message.decode(metadata, countOutputs);
                 
                 if(hasGenesis)
                 {
@@ -562,6 +566,11 @@ public class CoinSparkTest {
                 if(hasTransferList)
                 {
                     writeOutput(transfers.toString());
+                }
+   
+                if(hasMessage)
+                {
+                    writeOutput(message.toString());
                 }
    
                 byte [] encoded=null;
@@ -611,6 +620,25 @@ public class CoinSparkTest {
                     if(this_encoded == null)
                     {
                         writeLogLine("Failed to encode transfer list " + ScriptPubKeyHex);
+                        this_result=false;                                           
+                    }
+                    else
+                    {
+                        encoded=CoinSparkBase.metadataAppend(encoded, 40, this_encoded);
+                        if(encoded == null)
+                        {
+                            writeLogLine("Failed to append encoded metadata " + ScriptPubKeyHex);
+                            this_result=false;                                                                      
+                        }
+                    }
+                }
+                
+                if(hasMessage)
+                {
+                    this_encoded=message.encode(countOutputs,maxMetadataLen);
+                    if(this_encoded == null)
+                    {
+                        writeLogLine("Failed to encode message " + ScriptPubKeyHex);
                         this_result=false;                                           
                     }
                     else
@@ -677,6 +705,21 @@ public class CoinSparkTest {
                     if(!transfers.match(transfers,false))
                     {
                         writeLogLine("Failed to leniently match transfer list to itself! " + ScriptPubKeyHex);                    
+                        this_result=false;
+                    }
+                }
+                
+                if(hasMessage)
+                {
+                    if(!message.match(message,true))
+                    {
+                        writeLogLine("Failed to strictly match message to itself! " + ScriptPubKeyHex);                    
+                        this_result=false;
+                    }
+                    
+                    if(!message.match(message,false))
+                    {
+                        writeLogLine("Failed to leniently match message to itself! " + ScriptPubKeyHex);                    
                         this_result=false;
                     }
                 }
@@ -884,12 +927,12 @@ public class CoinSparkTest {
         return result;
     }
     
-    private boolean performHashTest(boolean ExitOnFailure)
+    private boolean performMessageHashTest(boolean ExitOnFailure)
     {
         boolean result=true;
         
         String line=getInputLine();
-        if((line == null) || !line.equals("CoinSpark Hash Tests Input"))
+        if((line == null) || !line.equals("CoinSpark MessageHash Tests Input"))
         {
             writeLogLine("Different header line expected, got " + line);
             return false;
@@ -901,7 +944,95 @@ public class CoinSparkTest {
             return false;
         }
         
-		writeOutputLine("CoinSpark Hash Tests Output");
+		writeOutputLine("CoinSpark MessageHash Tests Output");
+		writeOutputLine("");
+		
+        String [] lines;
+        
+        while((lines=getInputLines(2)) != null)
+        {
+            boolean try_again=true;
+            boolean this_result=true;
+            String salt=lines[0];
+            int countParts=Integer.valueOf(lines[1]);
+            CoinSparkMessage.ContentPart [] contentParts=new CoinSparkMessage.ContentPart[countParts];            
+            
+            
+            lines=getInputLines(3*countParts+1);
+            
+            if(lines != null)
+            {                
+                while(try_again)
+                {
+                    if(this_result)
+                    {
+                        try_again=false;
+                    }
+                    
+                    for(int index=0;index<countParts;index++)
+                    {
+                        contentParts[index]=new CoinSparkMessage().new ContentPart();
+                        contentParts[index].mimeType=lines[index*3+0];
+                        contentParts[index].fileName=lines[index*3+1];
+                        contentParts[index].content=lines[index*3+2].getBytes();
+                    }
+                    
+                    String hash=CoinSparkMessage.byteToHex(CoinSparkMessage.calcMessageHash(salt.getBytes(), contentParts));
+
+                    if(hash != null)
+                    {
+                        writeOutputLine(hash);
+                    }
+                    else
+                    {
+                        writeLogLine("Cannot calcualte hash for " + salt);
+                        this_result=false;                    
+                    }
+
+                    result &= this_result;
+                    if(!try_again)
+                    {
+                        if(!this_result)
+                        {
+                            try_again=true;
+                        }
+                    }
+                    else
+                    {
+                        if(ExitOnFailure)
+                        {
+                            return result;
+                        }
+                        else
+                        {
+                            try_again=false;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return result;
+    }
+
+    private boolean performAssetHashTest(boolean ExitOnFailure)
+    {
+        boolean result=true;
+        
+        String line=getInputLine();
+        if((line == null) || !line.equals("CoinSpark AssetHash Tests Input"))
+        {
+            writeLogLine("Different header line expected, got " + line);
+            return false;
+        }
+        line=getInputLine();
+        if((line == null) || (line.length()>0))
+        {
+            writeLogLine("Empty line expected, got " + line);
+            return false;
+        }
+        
+		writeOutputLine("CoinSpark AssetHash Tests Output");
 		writeOutputLine("");
 		
         String [] lines;
@@ -963,6 +1094,7 @@ public class CoinSparkTest {
         
         return result;
     }
+
 
     private boolean performTest()
     {
@@ -1028,7 +1160,7 @@ public class CoinSparkTest {
                 result &= performGenesisTest(true);
                 break;
             case HASH:
-                result &= performHashTest(true);
+                result &= performAssetHashTest(true);
                 break;
             case REFERENCE:
                 result &= performAssetRefTest(true);
@@ -1038,6 +1170,9 @@ public class CoinSparkTest {
                 break;
             case TRANSFER:
                 result &= performTransferTest(true);
+                break;            
+            case MESSAGE:
+                result &= performMessageHashTest(true);
                 break;            
         }
         
@@ -1101,7 +1236,7 @@ public class CoinSparkTest {
             String testMode = br.readLine();
             if (testMode.length() == 0)
             {
-                testMode="ARSHGT";
+                testMode="ARSHGTM";
             }            
             
             System.out.print(String.format("Directory name for tests: "));

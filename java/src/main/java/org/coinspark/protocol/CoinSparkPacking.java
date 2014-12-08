@@ -26,7 +26,7 @@
 package org.coinspark.protocol;
 
 /**
- * Internal class with sattic functions needed for packing/unpacking transfer metadata
+ * Internal class with static functions needed for packing/unpacking transfer metadata
  */
 
 public class CoinSparkPacking {
@@ -57,9 +57,11 @@ public class CoinSparkPacking {
     static protected final byte COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT=0;
 
     static protected final byte COINSPARK_PACKING_EXTEND_MASK        = 0x07;
-    static protected final byte COINSPARK_PACKING_EXTEND_0P          = 0x00; // index 0 only or previous
-    static protected final byte COINSPARK_PACKING_EXTEND_1S          = 0x01; // index 1 only or subsequent single
-    static protected final byte COINSPARK_PACKING_EXTEND_BYTE        = 0x02; // 1 byte for single index
+    static protected final byte COINSPARK_PACKING_EXTEND_0P          = 0x00; // index 0 only or previous(transfers only)
+    static protected final int  COINSPARK_PACKING_EXTEND_PUBLIC      = 0x00; // this is public (messages only)
+    static protected final byte COINSPARK_PACKING_EXTEND_1S          = 0x01; // index 1 only or subsequent single (transfers only)
+    static protected final byte COINSPARK_PACKING_EXTEND_0_1_BYTE    = 0x01; // // starting at 0, 1 byte for count (messages only)
+    static protected final byte COINSPARK_PACKING_EXTEND_1_0_BYTE    = 0x02; // 1 byte for single index
     static protected final byte COINSPARK_PACKING_EXTEND_2_BYTES     = 0x03; // 2 bytes for single index
     static protected final byte COINSPARK_PACKING_EXTEND_1_1_BYTES   = 0x04; // 1 byte for first index, 1 byte for count
     static protected final byte COINSPARK_PACKING_EXTEND_2_1_BYTES   = 0x05; // 2 bytes for first index, 1 byte for count
@@ -76,17 +78,18 @@ public class CoinSparkPacking {
     static protected final byte COINSPARK_PACKING_QUANTITY_FLOAT     = 0x06;
     static protected final byte COINSPARK_PACKING_QUANTITY_MAX       = 0x07; // transfer all quantity across
     
-    private final static int maxPackingTypes = 8;//TBD
+    private final static int maxPackingTypes = 9;//TBD
     protected enum PackingType {      // do not want to use ordinal. see Joshua Bloch, Effective Java (2nd ed), item 31
         _NONE(-1),
         _0P(0),
         _1S(1),
         _ALL(2),
-        _BYTE(3),
-        _2_BYTES(4),
-        _1_1_BYTES(5),
-        _2_1_BYTES(6),
-        _2_2_BYTES(7),
+        _1_0_BYTE(3),
+        _0_1_BYTE(4),
+        _2_BYTES(5),
+        _1_1_BYTES(6),
+        _2_1_BYTES(7),
+        _2_2_BYTES(8),
         countPackingTypes(maxPackingTypes); //TBD
 
         private final int value;
@@ -103,11 +106,12 @@ public class CoinSparkPacking {
             COINSPARK_PACKING_EXTEND_0P,
             COINSPARK_PACKING_EXTEND_1S,
             COINSPARK_PACKING_EXTEND_ALL,
-            COINSPARK_PACKING_EXTEND_BYTE,
+            COINSPARK_PACKING_EXTEND_1_0_BYTE,
+            COINSPARK_PACKING_EXTEND_0_1_BYTE,
             COINSPARK_PACKING_EXTEND_2_BYTES,
             COINSPARK_PACKING_EXTEND_1_1_BYTES,
             COINSPARK_PACKING_EXTEND_2_1_BYTES,
-            COINSPARK_PACKING_EXTEND_2_2_BYTES
+            COINSPARK_PACKING_EXTEND_2_2_BYTES,
     };
 
     protected static Byte encodePackingExtend(boolean [] packingOptions)
@@ -122,15 +126,16 @@ public class CoinSparkPacking {
     }
     
     
-    protected static PackingType decodePackingExtend(byte packingExtend)
+    protected static PackingType decodePackingExtend(byte packingExtend, boolean ForMessages)
     {
         PackingType packingType = PackingType._NONE;
         for (PackingType option :  PackingType.values()) {       
             if (option != PackingType._NONE && option != PackingType.countPackingTypes)
-                if (packingExtend==packingExtendMap[option.getValue()]) {
-                    packingType=option;
-                    return packingType;
-                }
+                if(option!=(ForMessages ? PackingType._1S : PackingType._0_1_BYTE))// no _1S for messages, no _0_1_BYTE for transfers
+                    if (packingExtend==packingExtendMap[option.getValue()]) {                    
+                        packingType=option;
+                        return packingType;
+                    }
         }
 
         return packingType;
@@ -195,7 +200,11 @@ public class CoinSparkPacking {
                 range.count=1;
                 break;
 
-            case _BYTE:
+            case _0_1_BYTE:
+                range.first=0;
+                break;
+                
+            case _1_0_BYTE:
             case _2_BYTES:
                 range.count=1;
                 break;
@@ -212,6 +221,46 @@ public class CoinSparkPacking {
         return range;
     }
     
+    protected static int [] packingExtendAddByteCounts(int packingExtend,int firstBytes, int countBytes)
+    {
+        int [] result=new int[3];
+        
+        result[0]=0;                                                            // Reserved for packing
+        result[1]=firstBytes;
+        result[2]=countBytes;
+        
+        switch (packingExtend)
+        {
+            case COINSPARK_PACKING_EXTEND_0_1_BYTE:
+                result[2]=1;
+                break;
+		
+            case COINSPARK_PACKING_EXTEND_1_0_BYTE:
+                result[1] = 1;
+                break;
+
+            case COINSPARK_PACKING_EXTEND_2_BYTES:
+                result[1] = 2;
+                break;
+
+            case COINSPARK_PACKING_EXTEND_1_1_BYTES:
+                result[1] = 1;
+                result[2] = 1;
+                break;
+
+            case COINSPARK_PACKING_EXTEND_2_1_BYTES:
+                result[1] = 2;
+                result[2] = 1;
+                break;
+
+            case COINSPARK_PACKING_EXTEND_2_2_BYTES:
+                result[1] = 2;
+                result[2] = 2;
+                break;
+        }
+        
+        return result;
+    }
     
     protected static PackingByteCounts packingToByteCounts(byte packing, byte packingExtend)
     {
@@ -246,11 +295,24 @@ public class CoinSparkPacking {
 
         if ((packing & COINSPARK_PACKING_INDICES_MASK) == COINSPARK_PACKING_INDICES_EXTEND) { // we're using extended indices
 
+            int countsBytes[];
+            
             //  Input indices
-
+            countsBytes=packingExtendAddByteCounts(((packingExtend >> COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK),
+                counts.firstInputBytes,counts.countInputsBytes);
+            counts.firstInputBytes=countsBytes[1];
+            counts.countInputsBytes=countsBytes[2];
+            
+            //  Output indices
+            countsBytes=packingExtendAddByteCounts(((packingExtend >> COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK),
+                counts.firstOutputBytes,counts.countOutputsBytes);
+            counts.firstOutputBytes=countsBytes[1];
+            counts.countOutputsBytes=countsBytes[2];
+            
+/*                
             switch ((packingExtend >> COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK)
             {
-                case COINSPARK_PACKING_EXTEND_BYTE:
+                case COINSPARK_PACKING_EXTEND_1_0_BYTE:
                     counts.firstInputBytes = 1;
                     break;
 
@@ -278,7 +340,7 @@ public class CoinSparkPacking {
 
             switch ((packingExtend >> COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK)
             {
-                case COINSPARK_PACKING_EXTEND_BYTE:
+                case COINSPARK_PACKING_EXTEND_1_0_BYTE:
                     counts.firstOutputBytes = 1;
                     break;
 
@@ -302,8 +364,8 @@ public class CoinSparkPacking {
                     break;
             }
 
+*/
         }
-
         //  Packing for quantity
 
         switch (packing & COINSPARK_PACKING_QUANTITY_MASK)
@@ -336,7 +398,7 @@ public class CoinSparkPacking {
         return counts;
     }
     
-    protected static boolean [] getPackingOptions(CoinSparkIORange previousRange, CoinSparkIORange range, int countInputOutputs)
+    protected static boolean [] getPackingOptions(CoinSparkIORange previousRange, CoinSparkIORange range, int countInputOutputs,boolean ForMessages)
     {
         boolean [] packingOptions=new boolean[maxPackingTypes];
         
@@ -348,17 +410,28 @@ public class CoinSparkPacking {
         countOne=(range.count == 1);
         countByte=(range.count <= COINSPARK_UNSIGNED_BYTE_MAX);
 
-        if (previousRange != null) {
-            packingOptions[PackingType._0P.getValue()]=(range.first==previousRange.first) &&
-                    (range.count == previousRange.count);
-            packingOptions[PackingType._1S.getValue()]=(range.first == (previousRange.first + previousRange.count)) && countOne;
+        if(ForMessages)
+        {
+            packingOptions[PackingType._0P.getValue()]=false;
+            packingOptions[PackingType._1S.getValue()]=false;
+            packingOptions[PackingType._0_1_BYTE.getValue()]=firstZero && countByte;
 
-        } else {
-            packingOptions[PackingType._0P.getValue()]=firstZero && countOne;
-            packingOptions[PackingType._1S.getValue()]=(range.first==1) && countOne;
+        }
+        else
+        {
+            if (previousRange != null) {
+                packingOptions[PackingType._0P.getValue()]=(range.first==previousRange.first) &&
+                        (range.count == previousRange.count);
+                packingOptions[PackingType._1S.getValue()]=(range.first == (previousRange.first + previousRange.count)) && countOne;
+
+            } else {
+                packingOptions[PackingType._0P.getValue()]=firstZero && countOne;
+                packingOptions[PackingType._1S.getValue()]=(range.first==1) && countOne;
+            }
+            packingOptions[PackingType._0_1_BYTE.getValue()]=false;
         }
 
-        packingOptions[PackingType._BYTE.getValue()]=firstByte && countOne;
+        packingOptions[PackingType._1_0_BYTE.getValue()]=firstByte && countOne;
         packingOptions[PackingType._2_BYTES.getValue()]=first2Bytes && countOne;
         packingOptions[PackingType._1_1_BYTES.getValue()]=firstByte && countByte;
         packingOptions[PackingType._2_1_BYTES.getValue()]=first2Bytes && countByte;
