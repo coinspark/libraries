@@ -409,18 +409,18 @@ public class CoinSparkSamples {
     {
         byte[] salt = new byte [32];        
         Random rnd=new Random();        
-        rnd.nextBytes(salt); // random hash in example    
+        rnd.nextBytes(salt); 
      
         CoinSparkMessage.ContentPart [] contentParts=new CoinSparkMessage.ContentPart[2];            
             
         contentParts[0]=new CoinSparkMessage().new ContentPart();
-        contentParts[0].mimeType="text/plain";
+        contentParts[0].mimeType="text/plain";   // implies UTF-8 encoding
         contentParts[0].fileName=null;
         contentParts[0].content="Payment for the attached invoice - Bob".getBytes("UTF-8");
         
         contentParts[1]=new CoinSparkMessage().new ContentPart();
-        contentParts[1].mimeType="text/plain";
-        contentParts[1].fileName="of files/Invoice AB123.pdf";
+        contentParts[1].mimeType="application/pdf";
+        contentParts[1].fileName="files/Invoice AB123.pdf";
         contentParts[1].content=file_get_contents("files/Invoice AB123.pdf").getBytes("UTF-8");
         
         byte[] messageHash=CoinSparkMessage.calcMessageHash(salt, contentParts);
