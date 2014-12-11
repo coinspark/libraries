@@ -28,6 +28,7 @@ package org.coinspark.samples;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -366,7 +367,7 @@ public class CoinSparkSamples {
             url = new URL(Address);
         } catch (MalformedURLException ex) {
             Logger.getLogger(CoinSparkSamples.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
+            return "";
         }
         
         URLConnection connection;
@@ -374,7 +375,7 @@ public class CoinSparkSamples {
             connection = url.openConnection();
         } catch (IOException ex) {
             Logger.getLogger(CoinSparkSamples.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
+            return "";
         }
         
         InputStream input;
@@ -382,7 +383,7 @@ public class CoinSparkSamples {
             input = connection.getInputStream();
         } catch (IOException ex) {
             Logger.getLogger(CoinSparkSamples.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
+            return "";
         }
         byte[] buffer = new byte[4096];
         int n = - 1;
@@ -398,12 +399,36 @@ public class CoinSparkSamples {
             }
         } catch (IOException ex) {
             Logger.getLogger(CoinSparkSamples.class.getName()).log(Level.SEVERE, null, ex);
-            return null;
+            return "";
         }
         
         return sb.toString();
     }
     
+    public static byte[] CalculateMessageHash() throws UnsupportedEncodingException
+    {
+        byte[] salt = new byte [32];        
+        Random rnd=new Random();        
+        rnd.nextBytes(salt); // random hash in example    
+     
+        CoinSparkMessage.ContentPart [] contentParts=new CoinSparkMessage.ContentPart[2];            
+            
+        contentParts[0]=new CoinSparkMessage().new ContentPart();
+        contentParts[0].mimeType="text/plain";
+        contentParts[0].fileName=null;
+        contentParts[0].content="Payment for the attached invoice - Bob".getBytes("UTF-8");
+        
+        contentParts[1]=new CoinSparkMessage().new ContentPart();
+        contentParts[1].mimeType="text/plain";
+        contentParts[1].fileName="of files/Invoice AB123.pdf";
+        contentParts[1].content=file_get_contents("files/Invoice AB123.pdf").getBytes("UTF-8");
+        
+        byte[] messageHash=CoinSparkMessage.calcMessageHash(salt, contentParts);
+        // The messageHash variable now contains the CoinSpark message hash
+        
+        return messageHash;                
+    }
+     
     public static byte[] CalculateAssetHash()
     {
         String name="Credit at John Doe's";
@@ -531,6 +556,12 @@ public class CoinSparkSamples {
         readAssetRef();
 
         CalculateAssetHash();
+        
+        try {
+            CalculateMessageHash();
+        } catch (UnsupportedEncodingException ex) {
+            Logger.getLogger(CoinSparkSamples.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     
 }
