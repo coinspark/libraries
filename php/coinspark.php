@@ -2353,9 +2353,11 @@
 			if ($this->isPublic)
 				$hashLen--;
 			
-			foreach ($this->outputRanges as $outputRange)
-				if ($this->getOutputRangePacking($outputRange, $countOutputs, $firstBytes, $secondBytes))
+			foreach ($this->outputRanges as $outputRange) {
+				$packing=$this->getOutputRangePacking($outputRange, $countOutputs, $firstBytes, $secondBytes);
+				if (isset($packing))
 					$hashLen-=(1+$firstBytes+$countBytes);
+			}
 	
 			return min(max($hashLen, 0), COINSPARK_MESSAGE_HASH_MAX_LEN);
 		}

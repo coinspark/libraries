@@ -1027,8 +1027,8 @@ CoinSparkTransfer.prototype.COINSPARK_TRANSFER_QTY_FLOAT_EXPONENT_MULTIPLE=1001;
 CoinSparkTransfer.prototype.clear=function()
 {
 	this.assetRef=new CoinSparkAssetRef();
-	this.inputs=new CoinSparkInOutRange();
-	this.outputs=new CoinSparkInOutRange();
+	this.inputs=new CoinSparkIORange();
+	this.outputs=new CoinSparkIORange();
 	this.qtyPerOutput=0;
 }
 
@@ -1417,7 +1417,7 @@ CoinSparkTransfer.prototype.getPackingOptions=function(previousRange, range, cou
 
 CoinSparkTransfer.prototype.packingTypeToValues=function(packingType, previousRange, countInputOutputs)
 {
-	var range=new CoinSparkInOutRange();
+	var range=new CoinSparkIORange();
 	
 	switch (packingType)
 	{
@@ -2064,20 +2064,20 @@ CoinSparkPaymentRef.prototype.decode=function(metadata)
 
 //	Class used internally for input or output ranges	
 
-function CoinSparkInOutRange()
+function CoinSparkIORange()
 {
 	this.clear();
 }
 
-CoinSparkInOutRange.prototype=new CoinSparkBase();
+CoinSparkIORange.prototype=new CoinSparkBase();
 
-CoinSparkInOutRange.prototype.clear=function()
+CoinSparkIORange.prototype.clear=function()
 {
 	this.first=0;
 	this.count=0;
 }
 
-CoinSparkInOutRange.prototype.isValid=function()
+CoinSparkIORange.prototype.isValid=function()
 {
 	if ( (this.first<0) || (this.first>COINSPARK_IO_INDEX_MAX) || !this.isInteger(this.first) )
 		return false;
@@ -2088,7 +2088,7 @@ CoinSparkInOutRange.prototype.isValid=function()
 	return true;
 }
 
-CoinSparkInOutRange.prototype.match=function(otherInOutRange)
+CoinSparkIORange.prototype.match=function(otherInOutRange)
 {
 	return (this.first==otherInOutRange.first) && (this.count==otherInOutRange.count);
 }

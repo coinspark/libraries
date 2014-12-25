@@ -1389,8 +1389,8 @@ class CoinSparkTransfer(CoinSparkBase):
 
 	def clear(self):
 		self.assetRef=CoinSparkAssetRef()
-		self.inputs=CoinSparkInOutRange()
-		self.outputs=CoinSparkInOutRange()
+		self.inputs=CoinSparkIORange()
+		self.outputs=CoinSparkIORange()
 		self.qtyPerOutput=0
 
 
@@ -1775,7 +1775,7 @@ class CoinSparkTransfer(CoinSparkBase):
 
 
 	def packingTypeToValues(self, packingType, previousRange, countInputOutputs):
-		range=CoinSparkInOutRange()
+		range=CoinSparkIORange()
 		
 		if packingType=='_0P':
 			if previousRange:
@@ -2339,7 +2339,7 @@ class CoinSparkPaymentRef(CoinSparkBase):
 
 # Class used internally for input or output ranges
 
-class CoinSparkInOutRange(CoinSparkBase):
+class CoinSparkIORange(CoinSparkBase):
 
 	def __init__(self):
 		self.clear()

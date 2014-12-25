@@ -3533,7 +3533,7 @@ void CoinSparkCalcAssetHash(const char* name, size_t nameLen,
     free(buffer);
 }
 
-void CoinSparkCalcMessageHash(const char* salt, size_t saltLen, const CoinSparkMessagePart* messageParts,
+void CoinSparkCalcMessageHash(const unsigned char* salt, size_t saltLen, const CoinSparkMessagePart* messageParts,
                               const int countParts, unsigned char messageHash[32])
 {
     size_t bufferLen;

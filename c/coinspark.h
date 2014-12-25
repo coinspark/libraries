@@ -483,7 +483,7 @@ typedef struct {
     size_t contentLen;
 } CoinSparkMessagePart;
 
-void CoinSparkCalcMessageHash(const char* salt, size_t saltLen, const CoinSparkMessagePart* messageParts,
+void CoinSparkCalcMessageHash(const unsigned char* salt, size_t saltLen, const CoinSparkMessagePart* messageParts,
                               const int countParts, unsigned char messageHash[32]);
     // Calculates the messageHash for a CoinSpark message containing the given messageParts array (length countParts).
     // Pass in a random string in salt (length saltLen), that should be sent to the message server along with the content.
