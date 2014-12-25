@@ -78,14 +78,24 @@ public class CoinSparkDomainPath extends CoinSparkBase{
      * @param UsePrefix use "coinspark/" prefix
      */
     
-    protected CoinSparkDomainPath(String DomainName,String Path, boolean UseHttps, boolean UsePrefix)
+    public CoinSparkDomainPath(String DomainName,String Path, boolean UseHttps, boolean UsePrefix)
     {
         domainName=DomainName;
         path=Path;
         useHttps=UseHttps;
         usePrefix=UsePrefix;
     }
+
+    /**
+     * Calculates the URL.
+     * 
+     * @return String FUll Domain/path URL 
+     */
     
+    public String getFullURL()
+    {
+        return String.format("%s://%s/%s%s/", useHttps ? "https" : "http",domainName,usePrefix ? "coinspark/" : "",path).toLowerCase();
+    }
     
     /**
      * Returns true if all values in the asset web page are in their permitted ranges, false otherwise.
@@ -169,7 +179,6 @@ public class CoinSparkDomainPath extends CoinSparkBase{
         return String.format("%s://%s", useHttps ? "https" : "http",domainName);
     }
         
-    
 // Private variables/constants/functions       
     
     

@@ -955,7 +955,7 @@ public class CoinSparkTest {
             boolean this_result=true;
             String salt=lines[0];
             int countParts=Integer.valueOf(lines[1]);
-            CoinSparkMessage.ContentPart [] contentParts=new CoinSparkMessage.ContentPart[countParts];            
+            CoinSparkMessagePart [] contentParts=new CoinSparkMessagePart[countParts];            
             
             
             lines=getInputLines(3*countParts+1);
@@ -971,7 +971,7 @@ public class CoinSparkTest {
                     
                     for(int index=0;index<countParts;index++)
                     {
-                        contentParts[index]=new CoinSparkMessage().new ContentPart();
+                        contentParts[index]=new CoinSparkMessagePart();
                         contentParts[index].mimeType=lines[index*3+0];
                         contentParts[index].fileName=lines[index*3+1];
                         contentParts[index].content=lines[index*3+2].getBytes();

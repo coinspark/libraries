@@ -41,6 +41,7 @@ import org.coinspark.protocol.CoinSparkBase;
 import org.coinspark.protocol.CoinSparkGenesis;
 import org.coinspark.protocol.CoinSparkIORange;
 import org.coinspark.protocol.CoinSparkMessage;
+import org.coinspark.protocol.CoinSparkMessagePart;
 import org.coinspark.protocol.CoinSparkPaymentRef;
 import org.coinspark.protocol.CoinSparkTransfer;
 import org.coinspark.protocol.CoinSparkTransferList;
@@ -411,17 +412,18 @@ public class CoinSparkSamples {
         Random rnd=new Random();        
         rnd.nextBytes(salt); 
      
-        CoinSparkMessage.ContentPart [] contentParts=new CoinSparkMessage.ContentPart[2];            
+        CoinSparkMessagePart [] contentParts=new CoinSparkMessagePart[2];            
             
-        contentParts[0]=new CoinSparkMessage().new ContentPart();
+        contentParts[0]=new CoinSparkMessagePart();
         contentParts[0].mimeType="text/plain";   // implies UTF-8 encoding
         contentParts[0].fileName=null;
         contentParts[0].content="Payment for the attached invoice - Bob".getBytes("UTF-8");
         
-        contentParts[1]=new CoinSparkMessage().new ContentPart();
+        contentParts[1]=new CoinSparkMessagePart();
         contentParts[1].mimeType="application/pdf";
-        contentParts[1].fileName="files/Invoice AB123.pdf";
+        contentParts[1].fileName="Invoice AB123.pdf";
         contentParts[1].content=file_get_contents("files/Invoice AB123.pdf").getBytes("UTF-8");
+        // assume we have some function like this that we can use
         
         byte[] messageHash=CoinSparkMessage.calcMessageHash(salt, contentParts);
         // The messageHash variable now contains the CoinSpark message hash
