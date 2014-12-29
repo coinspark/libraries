@@ -81,8 +81,8 @@ function ProcessInputLines(inputSource)
 			result=ProcessScriptTests(inputSource);
 			break;
 			
-		case 'CoinSpark Hash Tests Input':
-			result=ProcessHashTests(inputSource);
+		case 'CoinSpark AssetHash Tests Input':
+			result=ProcessAssetHashTests(inputSource);
 			break;
 			
 		case 'CoinSpark Genesis Tests Input':
@@ -91,6 +91,10 @@ function ProcessInputLines(inputSource)
 			
 		case 'CoinSpark Transfer Tests Input':
 			result=ProcessTransferTests(inputSource);
+			break;
+			
+		case 'CoinSpark MessageHash Tests Input':
+			result=ProcessMessageHashTests(inputSource);
 			break;
 	}
 	
@@ -183,6 +187,9 @@ function ProcessScriptTests(inputSource)
 		
 		var transfers=new CoinSparkTransferList();
 		var hasTransfers=transfers.decode(metadata, countInputs, countOutputs);
+		
+		var message=new CoinSparkMessage();
+		var hasMessage=message.decode(metadata, countOutputs);
 	
 	//	Append the toString()s
 		
@@ -194,6 +201,9 @@ function ProcessScriptTests(inputSource)
 			
 		if (hasTransfers)
 			result+=transfers.toString();
+			
+		if (hasMessage)
+			result+=message.toString();
 	
 	//	Re-encode
 	
@@ -202,7 +212,7 @@ function ProcessScriptTests(inputSource)
 		var testMetadataMaxLen=metadata.length;
 		var nextMetadataMaxLen=testMetadataMaxLen;
 		
-		var encodeOrder=['genesis', 'paymentRef', 'transfers'];
+		var encodeOrder=['genesis', 'paymentRef', 'transfers', 'message'];
 		
 		for (encodeIndex=0; encodeIndex<encodeOrder.length; encodeIndex++) {
 			var encodeField=encodeOrder[encodeIndex];
@@ -226,6 +236,13 @@ function ProcessScriptTests(inputSource)
 				case 'transfers':
 					if (hasTransfers) {
 						nextMetadata=transfers.encode(countInputs, countOutputs, nextMetadataMaxLen);
+						triedNextMetadata=true;
+					}
+					break;
+					
+				case 'message':
+					if (hasMessage) {
+						nextMetadata=message.encode(countOutputs, nextMetadataMaxLen);
 						triedNextMetadata=true;
 					}
 					break;
@@ -283,6 +300,19 @@ function ProcessScriptTests(inputSource)
 				return result+"Failed to leniently match transfers to itself!\n";
 		}
 		
+		if (hasMessage) {
+			if (!message.match(message, true))
+				return result+"Failed to strictly match message to itself!\n";
+
+			if (!message.match(message, false))
+				return result+"Failed to leniently match message to itself!\n";
+			
+			var messageEncode=message.encode(countOutputs, metadata.length); // encode on its own to check calcHashLen()
+
+			if (message.calcHashLen(countOutputs, messageEncode.length)!=message.hashLen)
+				return result+"Failed to calculate matching message hash length!\n";
+		}
+		
 	//	Compare to the original
 		
 		var encoded=CoinSparkMetadataToScript(testMetadata, true);
@@ -300,9 +330,9 @@ function ProcessScriptTests(inputSource)
 }
 
 
-function ProcessHashTests(inputSource)
+function ProcessAssetHashTests(inputSource)
 {
-	var result="CoinSpark Hash Tests Output\n\n";
+	var result="CoinSpark AssetHash Tests Output\n\n";
 	
 	while (true) {
 		var inputLines=GetNextInputLines(inputSource, 10);
@@ -447,6 +477,39 @@ function ProcessTransferTests(inputSource)
 			if (inputBalance!=testNetBalance)
 				return result+"Net to gross to net mismatch: "+inputBalance+" -> "+testGrossBalance+" -> "+testNetBalance+"!\n";
 		}
+	}
+	
+	return result;
+}
+
+
+function ProcessMessageHashTests(inputSource)
+{
+	var result="CoinSpark MessageHash Tests Output\n\n";
+	
+	while (true) {
+		var inputLines=GetNextInputLines(inputSource, 2);
+		if (!inputLines)
+			break;
+			
+		var salt=inputLines[0];
+		var countParts=inputLines[1];
+			
+		inputLines=GetNextInputLines(inputSource, 3*countParts+1);
+		if (!inputLines)
+			break;
+			
+		var messageParts=[];
+		while ((messageParts.length<countParts) && inputLines.length)
+			messageParts[messageParts.length]={
+				'mimeType': inputLines.shift(),
+				'fileName': inputLines.shift(),
+				'content': inputLines.shift()
+			};
+		
+		var hash=CoinSparkCalcMessageHash(salt, messageParts);
+		
+		result+=CoinSparkUint8ArrayToHex(hash)+"\n";
 	}
 	
 	return result;

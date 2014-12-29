@@ -129,7 +129,7 @@
 			
 			if ($encoded!=$inputLine)
 				die("Encode address mismatch: $encoded should be $inputLine\n");
-
+				
 			if (!$address->match($address))
 				die("Failed to match address to itself!\n");
 		}
@@ -270,7 +270,7 @@
 					die("Failed to match genesis to itself!\n");
 				
 				if ($genesis->calcHashLen(strlen($metadata))!=$genesis->assetHashLen) // assumes that metadata only contains genesis
-					die("Failed to calculate matching hash length!\n");
+					die("Failed to calculate matching asset hash length!\n");
 				
 				$testGenesis=new CoinSparkGenesis();
 				$testGenesis->decode($metadata);
@@ -305,6 +305,11 @@
 
 				if (!$message->match($message, false))
 					die("Failed to leniently match message to itself!\n");
+					
+				$messageEncode=$message->encode($countOutputs, strlen($metadata)); // encode on its own to check calcHashLen()
+				
+				if ($message->calcHashLen($countOutputs, strlen($messageEncode))!=$message->hashLen)
+					die("Failed to calculate matching message hash length!\n");
 			}
 			
 		//	Compare to the original
@@ -476,6 +481,4 @@
 			
 			echo strtoupper(bin2hex($hash))."\n";
 		}
-
-	
 	}

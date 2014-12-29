@@ -320,7 +320,7 @@
     }
     
     
-//	Function for calculating asset hashes
+//	Function for calculating hashes
     
 	/**
 	 * Calculates the assetHash for the key information from a CoinSpark asset web page JSON specification.
@@ -2066,7 +2066,7 @@
 		function toString()
 		{
 			$hostPathMetadata=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix);
-			$urlString=$this->calcServerUrl();
+			$urlString=$this->calcServerURL();
 			
 			$buffer="COINSPARK MESSAGE\n";
 			$buffer.=sprintf("    Server URL: %s (length %d+%d encoded %s length %d)\n", $urlString,
@@ -2232,7 +2232,7 @@
 		{
 			$metadata=CoinSparkLocateMetadataRange($metadata, COINSPARK_MESSAGE_PREFIX);
 			if (!isset($metadata))
-				return 0;
+				return false;
 				
 		//  Server host and path
 			
@@ -2354,7 +2354,7 @@
 				$hashLen--;
 			
 			foreach ($this->outputRanges as $outputRange) {
-				$packing=$this->getOutputRangePacking($outputRange, $countOutputs, $firstBytes, $secondBytes);
+				$packing=$this->getOutputRangePacking($outputRange, $countOutputs, $firstBytes, $countBytes);
 				if (isset($packing))
 					$hashLen-=(1+$firstBytes+$countBytes);
 			}
@@ -2909,7 +2909,7 @@
 					$outRanges[$orderIndex-$countRemoved]->count=max($lastRangeEnd, $thisRangeEnd)-$outRanges[$orderIndex-$countRemoved]->first;
 		
 				} else
-					$outRanges[$orderIndex-$countRemoved]=$inRanges[$lowestRangeIndex];
+					$outRanges[$orderIndex-$countRemoved]=clone $inRanges[$lowestRangeIndex];
 			
 				$lastRangeEnd=$outRanges[$orderIndex-$countRemoved]->first+$outRanges[$orderIndex-$countRemoved]->count;
 				$rangeUsed[$lowestRangeIndex]=true;

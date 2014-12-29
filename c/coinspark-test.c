@@ -1782,7 +1782,7 @@ bool PerformMessageHashTests(char* directoryName, int countTests, bool toDisplay
             messageParts[partIndex].contentLen=strlen(content[partIndex]);
         }
         
-        CoinSparkCalcMessageHash(salt, strlen(salt), messageParts, countParts, messageHash);
+        CoinSparkCalcMessageHash((unsigned char*)salt, strlen(salt), messageParts, countParts, messageHash);
         
         if (inputFile) {
             fprintf(inputFile, "%s # salt\n%d # parts\n", salt, countParts);
@@ -1815,7 +1815,7 @@ int main(int argc, const char* argv[])
     int testSuite, countTests;
     bool toDisplay, toFiles;
 
- //   srand((unsigned int)time(NULL)); // if this is commented, the tests will be deterministic (at least on Mac OS X)
+    srand((unsigned int)time(NULL)); // if this is commented, the tests will be deterministic (at least on Mac OS X)
 
 //  Ask the user which tests to perform
     

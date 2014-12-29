@@ -52,10 +52,18 @@ var COINSPARK_ASSETREF_TXID_PREFIX_LEN = 2;
 
 var COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE = -1; // magic number for a default route
 
+var COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN = 32;
+var COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN = 24;
+var COINSPARK_MESSAGE_HASH_MIN_LEN = 12;
+var COINSPARK_MESSAGE_HASH_MAX_LEN = 32;
+var COINSPARK_MESSAGE_MAX_IO_RANGES = 16;
+
 var COINSPARK_IO_INDEX_MAX = 65535;
 	
 var COINSPARK_ADDRESS_FLAG_ASSETS = 1;
 var COINSPARK_ADDRESS_FLAG_PAYMENT_REFS = 2;
+var COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES = 4;
+var COINSPARK_ADDRESS_FLAG_FILE_MESSAGES = 8;
 var COINSPARK_ADDRESS_FLAG_MASK = 0x7FFFFF; // 23 bits are currently usable
 
 
@@ -72,6 +80,7 @@ var COINSPARK_LENGTH_PREFIX_MAX = 96;
 var COINSPARK_GENESIS_PREFIX = 'g';
 var COINSPARK_TRANSFERS_PREFIX = 't';
 var COINSPARK_PAYMENTREF_PREFIX = 'r';
+var COINSPARK_MESSAGE_PREFIX = 'm';
 
 var COINSPARK_FEE_BASIS_MAX_SATOSHIS = 1000;
 
@@ -240,7 +249,7 @@ function CoinSparkScriptIsRegular(scriptPubKey, scriptIsHex)
 }
 
 
-//	Function for calculating asset hashes
+//	Function for calculating hashes
 
 function CoinSparkCalcAssetHash(name, issuer, description, units, issueDate, expiryDate, interestRate, multiple, contractContent)
 {
@@ -260,6 +269,19 @@ function CoinSparkCalcAssetHash(name, issuer, description, units, issueDate, exp
 	var array=CoinSparkStringToUint8ArrayUTF8(buffer).concat(contractContent).concat([0x00]);
 	
 	return CoinSparkUint8ArraySHA256(array);
+}
+
+function CoinSparkCalcMessageHash(salt, messageParts)
+{
+	var buffer=salt+"\x00";
+	
+	for (var part=0; part<messageParts.length; part++) {
+		var messagePart=messageParts[part];
+		buffer+=messagePart['mimeType']+"\x00"+((messagePart['fileName']===null) ? '' : messagePart['fileName'])+
+			"\x00"+messagePart['content']+"\x00";
+	}
+	
+	return CoinSparkUint8ArraySHA256(CoinSparkStringToUint8ArrayUTF8(buffer));
 }
 
 function CoinSparkAssetHashFieldTrim(string)
@@ -292,7 +314,9 @@ CoinSparkAddress.prototype.toString=function()
 {
 	var flagsToStrings=[
 		[COINSPARK_ADDRESS_FLAG_ASSETS, "assets"],
-		[COINSPARK_ADDRESS_FLAG_PAYMENT_REFS, "payment references"]
+		[COINSPARK_ADDRESS_FLAG_PAYMENT_REFS, "payment references"],
+		[COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES, "text messages"],
+		[COINSPARK_ADDRESS_FLAG_FILE_MESSAGES, "file messages"]
 	];
 	
 	var buffer="COINSPARK ADDRESS\n";
@@ -520,7 +544,7 @@ CoinSparkGenesis.prototype.toString=function()
 	var chargeFlatEncoded=this.chargeFlatExponent*this.COINSPARK_GENESIS_CHARGE_FLAT_EXPONENT_MULTIPLE+this.chargeFlatMantissa;
 	var domainPathMetadata=this.encodeDomainAndOrPath(this.domainName, this.useHttps, this.pagePath, this.usePrefix);
 	
-	buffer="COINSPARK GENESIS\n";
+	var buffer="COINSPARK GENESIS\n";
 	buffer+="   Quantity mantissa: "+this.qtyMantissa+"\n";
 	buffer+="   Quantity exponent: "+this.qtyExponent+"\n";
 	buffer+="    Quantity encoded: "+quantityEncoded+" (small endian hex "+
@@ -609,7 +633,8 @@ CoinSparkGenesis.prototype.match=function(otherGenesis, strict)
 		(this.domainName.toLowerCase()==otherGenesis.domainName.toLowerCase()) &&
 		(this.usePrefix==otherGenesis.usePrefix) &&
 		(this.pagePath.toLowerCase()==otherGenesis.pagePath.toLowerCase()) &&
-		(this.assetHash.slice(0, hashCompareLen).toString()==otherGenesis.assetHash.slice(0, hashCompareLen).toString());
+		(CoinSparkUint8ArrayToHex(this.assetHash.slice(0, hashCompareLen))==
+			CoinSparkUint8ArrayToHex(otherGenesis.assetHash.slice(0, hashCompareLen)));
 }
 
 CoinSparkGenesis.prototype.getQty=function()
@@ -798,10 +823,10 @@ CoinSparkGenesis.prototype.decode=function(metadata)
 	if (!decodedDomainPath)
 		return false;
 		
-	this.useHttps=decodedDomainPath.useHttps;
-	this.domainName=decodedDomainPath.domainName;
-	this.usePrefix=decodedDomainPath.usePrefix;
-	this.pagePath=decodedDomainPath.pagePath;
+	this.useHttps=decodedDomainPath['useHttps'];
+	this.domainName=decodedDomainPath['domainName'];
+	this.usePrefix=decodedDomainPath['usePrefix'];
+	this.pagePath=decodedDomainPath['pagePath'];
 
 //	Asset hash
 
@@ -998,16 +1023,6 @@ CoinSparkTransfer.prototype.COINSPARK_PACKING_INDICES_EXTEND=0x38; // use second
 CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT=3;
 CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT=0;
 
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_MASK=0x07;
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_0P=0x00; // index 0 only or previous
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_1S=0x01; // index 1 only or subsequent single
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_BYTE=0x02; // 1 byte for single index
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_2_BYTES=0x03; // 2 bytes for single index
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_1_1_BYTES=0x04; // 1 byte for first index, 1 byte for count
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_2_1_BYTES=0x05; // 2 bytes for first index, 1 byte for count
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_2_2_BYTES=0x06; // 2 bytes for first index, 2 bytes for count
-CoinSparkTransfer.prototype.COINSPARK_PACKING_EXTEND_ALL=0x07; // all inputs|outputs
-
 CoinSparkTransfer.prototype.COINSPARK_PACKING_QUANTITY_MASK=0x07;
 CoinSparkTransfer.prototype.COINSPARK_PACKING_QUANTITY_1P=0x00; // quantity=1 or previous
 CoinSparkTransfer.prototype.COINSPARK_PACKING_QUANTITY_1_BYTE=0x01;
@@ -1099,8 +1114,8 @@ CoinSparkTransfer.prototype.encode=function(previousTransfer, metadataMaxLen, co
 		
 //	Packing for input and output indices
 
-	var inputPackingOptions=this.getPackingOptions(previousTransfer ? previousTransfer.inputs : null, this.inputs, countInputs);
-	var outputPackingOptions=this.getPackingOptions(previousTransfer ? previousTransfer.outputs : null, this.outputs, countOutputs);
+	var inputPackingOptions=this.getPackingOptions(previousTransfer ? previousTransfer.inputs : null, this.inputs, countInputs, false);
+	var outputPackingOptions=this.getPackingOptions(previousTransfer ? previousTransfer.outputs : null, this.outputs, countOutputs, false);
 	
 	if (inputPackingOptions['_0P'] && outputPackingOptions['_0P'])
 		packing|=this.COINSPARK_PACKING_INDICES_0P_0P;
@@ -1228,8 +1243,10 @@ CoinSparkTransfer.prototype.decode=function(_metadata, previousTransfer, countIn
 		if (typeof packingExtend == 'undefined')
 			return 0;
 			
-		var inputPackingType=this.decodePackingExtend((packingExtend >> this.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & this.COINSPARK_PACKING_EXTEND_MASK);
-		var outputPackingType=this.decodePackingExtend((packingExtend >> this.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & this.COINSPARK_PACKING_EXTEND_MASK);
+		var inputPackingType=this.decodePackingExtend((packingExtend >> this.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) &
+			this.COINSPARK_PACKING_EXTEND_MASK, false);
+		var outputPackingType=this.decodePackingExtend((packingExtend >> this.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) &
+			this.COINSPARK_PACKING_EXTEND_MASK, false);
 
 		if ( (inputPackingType===null) || (outputPackingType===null) )
 			return 0;
@@ -1287,14 +1304,14 @@ CoinSparkTransfer.prototype.decode=function(_metadata, previousTransfer, countIn
 	var txIDPrefixBytes=counts['txIDPrefixBytes'];
 	
 	var read_array=[
-		this.readUnsignedField(metadata, counts['blockNumBytes'], this.assetRef, 'blockNum'),
-		this.readUnsignedField(metadata, counts['txOffsetBytes'], this.assetRef, 'txOffset'),
+		this.shiftReadUnsignedField(metadata, counts['blockNumBytes'], this.assetRef, 'blockNum'),
+		this.shiftReadUnsignedField(metadata, counts['txOffsetBytes'], this.assetRef, 'txOffset'),
 		(txIDPrefixBytes==0) ? true : (this.assetRef.txIDPrefix=CoinSparkUint8ArrayToHex(metadata.splice(0, txIDPrefixBytes)), this.assetRef.txIDPrefix.length==(2*txIDPrefixBytes)),
-		this.readUnsignedField(metadata, counts['firstInputBytes'], this.inputs, 'first'),
-		this.readUnsignedField(metadata, counts['countInputsBytes'], this.inputs, 'count'),
-		this.readUnsignedField(metadata, counts['firstOutputBytes'], this.outputs, 'first'),
-		this.readUnsignedField(metadata, counts['countOutputsBytes'], this.outputs, 'count'),
-		this.readUnsignedField(metadata, counts['quantityBytes'], this, 'qtyPerOutput')
+		this.shiftReadUnsignedField(metadata, counts['firstInputBytes'], this.inputs, 'first'),
+		this.shiftReadUnsignedField(metadata, counts['countInputsBytes'], this.inputs, 'count'),
+		this.shiftReadUnsignedField(metadata, counts['firstOutputBytes'], this.outputs, 'first'),
+		this.shiftReadUnsignedField(metadata, counts['countOutputsBytes'], this.outputs, 'count'),
+		this.shiftReadUnsignedField(metadata, counts['quantityBytes'], this, 'qtyPerOutput')
 	];
 
 	for (j=0; j<read_array.length; j++)
@@ -1386,74 +1403,6 @@ CoinSparkTransfer.prototype.toStringInner=function(headers)
 	return buffer;
 }
 
-CoinSparkTransfer.prototype.getPackingOptions=function(previousRange, range, countInputsOutputs)
-{
-	var packingOptions={};
-	
-	var firstZero=(range.first==0);
-	var firstByte=(range.first<=COINSPARK_UNSIGNED_BYTE_MAX);
-	var first2Bytes=(range.first<=COINSPARK_UNSIGNED_2_BYTES_MAX);
-	var countOne=(range.count==1);
-	var countByte=(range.count<=COINSPARK_UNSIGNED_BYTE_MAX);
-	
-	if (previousRange) {
-		packingOptions['_0P']=(range.first==previousRange.first) && (range.count==previousRange.count);
-		packingOptions['_1S']=(range.first==(previousRange.first+previousRange.count)) && countOne;
-		
-	} else {
-		packingOptions['_0P']=firstZero && countOne;
-		packingOptions['_1S']=(range.first==1) && countOne;
-	}
-	
-	packingOptions['_BYTE']=firstByte && countOne;
-	packingOptions['_2_BYTES']=first2Bytes && countOne;
-	packingOptions['_1_1_BYTES']=firstByte && countByte;
-	packingOptions['_2_1_BYTES']=first2Bytes && countByte;
-	packingOptions['_2_2_BYTES']=first2Bytes && (range.count<=COINSPARK_UNSIGNED_2_BYTES_MAX);
-	packingOptions['_ALL']=firstZero && (range.count>=countInputsOutputs);
-	
-	return packingOptions;
-}
-
-CoinSparkTransfer.prototype.packingTypeToValues=function(packingType, previousRange, countInputOutputs)
-{
-	var range=new CoinSparkIORange();
-	
-	switch (packingType)
-	{
-		case '_0P':
-			if (previousRange) {
-				range.first=previousRange.first;
-				range.count=previousRange.count;
-			} else {
-				range.first=0;
-				range.count=1;
-			}
-			break;
-	
-		case '_1S':
-			if (previousRange)
-				range.first=previousRange.first+previousRange.count;
-			else
-				range.first=1;
-	
-			range.count=1;
-			break;
-	
-		case '_BYTE':
-		case '_2_BYTES':
-			range.count=1;
-			break;
-	
-		case '_ALL':
-			range.first=0;
-			range.count=countInputOutputs;
-			break;
-	}
-	
-	return range;
-}
-
 CoinSparkTransfer.prototype.packingToByteCounts=function(packing, packingExtend)
 {
 
@@ -1498,65 +1447,19 @@ CoinSparkTransfer.prototype.packingToByteCounts=function(packing, packingExtend)
 //  Packing for input and output indices (relevant for extended indices only)
 
 	if ((packing & this.COINSPARK_PACKING_INDICES_MASK) == this.COINSPARK_PACKING_INDICES_EXTEND) {
-
-	//  Input indices
-
-		switch ((packingExtend >> this.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & this.COINSPARK_PACKING_EXTEND_MASK)
-		{
-			case this.COINSPARK_PACKING_EXTEND_BYTE:
-				counts['firstInputBytes']=1;
-				break;
+		var getCounts=this.packingExtendAddByteCounts((packingExtend >> this.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) &
+			this.COINSPARK_PACKING_EXTEND_MASK, counts['firstInputBytes'], counts['countInputsBytes']);
 		
-			case this.COINSPARK_PACKING_EXTEND_2_BYTES:
-				counts['firstInputBytes']=2;
-				break;
+		counts['firstInputBytes']=getCounts['firstBytes'];
+		counts['countInputsBytes']=getCounts['countBytes'];
 		
-			case this.COINSPARK_PACKING_EXTEND_1_1_BYTES:
-				counts['firstInputBytes']=1;
-				counts['countInputsBytes']=1;
-				break;
-		
-			case this.COINSPARK_PACKING_EXTEND_2_1_BYTES:
-				counts['firstInputBytes']=2;
-				counts['countInputsBytes']=1;
-				break;
-		
-			case this.COINSPARK_PACKING_EXTEND_2_2_BYTES:
-				counts['firstInputBytes']=2;
-				counts['countInputsBytes']=2;
-				break;
-		}
-
-	//  Output indices
-
-		switch ((packingExtend >> this.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & this.COINSPARK_PACKING_EXTEND_MASK)
-		{
-			case this.COINSPARK_PACKING_EXTEND_BYTE:
-				counts['firstOutputBytes']=1;
-				break;
-		
-			case this.COINSPARK_PACKING_EXTEND_2_BYTES:
-				counts['firstOutputBytes']=2;
-				break;
-		
-			case this.COINSPARK_PACKING_EXTEND_1_1_BYTES:
-				counts['firstOutputBytes']=1;
-				counts['countOutputsBytes']=1;
-				break;
-		
-			case this.COINSPARK_PACKING_EXTEND_2_1_BYTES:
-				counts['firstOutputBytes']=2;
-				counts['countOutputsBytes']=1;
-				break;
-		
-			case this.COINSPARK_PACKING_EXTEND_2_2_BYTES:
-				counts['firstOutputBytes']=2;
-				counts['countOutputsBytes']=2;
-				break;
-		}
-
+		getCounts=this.packingExtendAddByteCounts((packingExtend >> this.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) &
+			this.COINSPARK_PACKING_EXTEND_MASK, counts['firstOutputBytes'], counts['countOutputsBytes']);
+			
+		counts['firstOutputBytes']=getCounts['firstBytes'];
+		counts['countOutputsBytes']=getCounts['countBytes'];
 	}
-
+		
 //  Packing for quantity
 
 	switch (packing & this.COINSPARK_PACKING_QUANTITY_MASK)
@@ -1590,61 +1493,6 @@ CoinSparkTransfer.prototype.packingToByteCounts=function(packing, packingExtend)
 	
 	return counts;
 }
-
-CoinSparkTransfer.prototype.getPackingExtendMap=function()
-{
-	 return {
-		'_0P':this.COINSPARK_PACKING_EXTEND_0P,
-		'_1S':this.COINSPARK_PACKING_EXTEND_1S,
-		'_ALL':this.COINSPARK_PACKING_EXTEND_ALL,
-		'_BYTE':this.COINSPARK_PACKING_EXTEND_BYTE,
-		'_2_BYTES':this.COINSPARK_PACKING_EXTEND_2_BYTES,
-		'_1_1_BYTES':this.COINSPARK_PACKING_EXTEND_1_1_BYTES,
-		'_2_1_BYTES':this.COINSPARK_PACKING_EXTEND_2_1_BYTES,
-		'_2_2_BYTES':this.COINSPARK_PACKING_EXTEND_2_2_BYTES
-	}; // in order of preference
-}
-
-CoinSparkTransfer.prototype.encodePackingExtend=function(packingOptions)
-{
-	var packingExtendMap=this.getPackingExtendMap();
-	
-	for (var packingType in packingExtendMap)
-		if (packingOptions[packingType])
-			return packingExtendMap[packingType];
-			
-	return null;
-}
-
-CoinSparkTransfer.prototype.decodePackingExtend=function(packingExtend)
-{
-	var packingExtendMap=this.getPackingExtendMap();
-	
-	for (var packingType in packingExtendMap)
-		if (packingExtend==packingExtendMap[packingType])
-			return packingType;
-			
-	return null;
-}
-
-CoinSparkTransfer.prototype.writeUnsignedField=function(bytes, source)
-{
-	return (bytes>0) ? this.writeSmallEndianUnsigned(source, bytes) : []; // will return null on failure
-}
-
-CoinSparkTransfer.prototype.readUnsignedField=function(metadata, bytes, object, property)
-{
-	if (bytes>0) {
-		var value=this.shiftReadSmallEndianUnsigned(metadata.splice(0, bytes), bytes);
-		if (value===null)
-			return false;
-		
-		object[property]=value;
-	}
-	
-	return true;
-}
-
 
 //	CoinSparkTransferList class for managing list of asset transfer metadata
 
@@ -2062,6 +1910,387 @@ CoinSparkPaymentRef.prototype.decode=function(metadata)
 }
 
 
+// CoinSparkMessage class for managing message metadata
+
+function CoinSparkMessage()
+{
+	this.clear();
+}
+
+CoinSparkMessage.prototype=new CoinSparkBase();
+
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_MORE_FLAG=0x80;
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_RESERVED_MASK=0x60;
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_TYPE_MASK=0x18;
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_TYPE_SINGLE=0x00; // one output index (0...7)
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_TYPE_FIRST=0x08; // first (0...7) outputs
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_TYPE_UNUSED=0x10; // for future use
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_TYPE_EXTEND=0x18; // "extend", including public/all
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_VALUE_MASK=0x07;
+CoinSparkMessage.prototype.COINSPARK_OUTPUTS_VALUE_MAX=7;
+
+CoinSparkMessage.prototype.clear=function()
+{
+	this.useHttps=false;
+	this.serverHost='';
+	this.usePrefix=false;
+	this.serverPath='';
+	this.isPublic=false;
+	this.outputRanges=[];
+	this.hash=[];
+	this.hashLen=0;
+}
+
+CoinSparkMessage.prototype.toString=function()
+{
+	var hostPathMetadata=this.encodeDomainAndOrPath(this.serverHost, this.useHttps, this.serverPath, this.usePrefix);
+	var urlString=this.calcServerURL();
+	
+	var buffer="COINSPARK MESSAGE\n";
+	buffer+="    Server URL: "+urlString+" (length "+this.serverHost.length+"+"+this.serverPath.length+" encoded "+
+		CoinSparkUint8ArrayToHex(hostPathMetadata)+" length "+hostPathMetadata.length+")\n";
+	buffer+="Public message: "+(this.isPublic ? "yes" : "no")+"\n";
+	
+	for (var rangeIndex=0; rangeIndex<this.outputRanges.length; rangeIndex++) {
+		outputRange=this.outputRanges[rangeIndex];
+
+		if (outputRange.count>0) {
+			if (outputRange.count>1)
+				buffer+="       Outputs: "+outputRange.first+" - "+(outputRange.first+outputRange.count-1)+" (count "+outputRange.count+")";
+			else
+				buffer+="        Output: "+outputRange.first;
+		} else
+			buffer+="       Outputs: none";
+
+		buffer+=" (small endian hex: first "+this.unsignedToSmallEndianHex(outputRange.first, 2)+
+			" count "+this.unsignedToSmallEndianHex(outputRange.count, 2)+")\n";
+	}
+	
+	buffer+="  Message hash: "+CoinSparkUint8ArrayToHex(this.hash.slice(0, this.hashLen))+" (length "+this.hashLen+")\n";
+	buffer+="END COINSPARK MESSAGE\n\n";
+	
+	return buffer;
+}
+
+CoinSparkMessage.prototype.isValid=function()
+{
+	if (!(
+		this.isBoolean(this.useHttps) &&
+		this.isString(this.serverHost) &&
+		this.isBoolean(this.usePrefix) &&
+		this.isString(this.serverPath) &&
+		this.isBoolean(this.isPublic) &&
+		(this.outputRanges instanceof Array) &&
+		this.isUInt8Array(this.hash) &&
+		this.isInteger(this.hashLen)
+	))
+		return false;
+	
+	if (this.serverHost.length>COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN)
+		return false;
+
+	if (this.serverPath.length>COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN)
+		return false;
+		
+	if (this.hash.length<this.hashLen) // check we have at least as much data as specified by this.hashLen
+		return false; 
+
+	if ( (this.hashLen<COINSPARK_MESSAGE_HASH_MIN_LEN) || (this.hashLen>COINSPARK_MESSAGE_HASH_MAX_LEN) )
+		return false;
+
+	if ( (!this.isPublic) && (this.outputRanges.length==0) ) // public or aimed at some outputs at least
+		return false;
+
+	if (this.outputRanges.length>COINSPARK_MESSAGE_MAX_IO_RANGES)
+		return false;
+	
+	for (var rangeIndex=0; rangeIndex<this.outputRanges.length; rangeIndex++)
+		if (!this.outputRanges[rangeIndex].isValid())
+			return false;
+
+	return true;
+}
+
+CoinSparkMessage.prototype.match=function(otherMessage, strict)
+{
+	var hashCompareLen=Math.min(this.hashLen, otherMessage.hashLen, COINSPARK_MESSAGE_HASH_MAX_LEN);
+
+	if (strict) {
+		var thisRanges=this.outputRanges;
+		var otherRanges=otherMessage.outputRanges;
+
+	} else {
+		var thisRanges=this.normalizeIORanges(this.outputRanges);
+		var otherRanges=this.normalizeIORanges(otherMessage.outputRanges);
+	}
+	
+	if (thisRanges.length != otherRanges.length)
+		return false;
+	
+	for (var rangeIndex=0; rangeIndex<thisRanges.length; rangeIndex++)
+		if (!thisRanges[rangeIndex].match(otherRanges[rangeIndex]))
+			return false;
+		
+	return (this.useHttps==otherMessage.useHttps) &&
+		(this.serverHost.toLowerCase()==otherMessage.serverHost.toLowerCase()) &&
+		(this.usePrefix==otherMessage.usePrefix) &&
+		(this.serverPath.toLowerCase()==otherMessage.serverPath.toLowerCase()) &&
+		(this.isPublic==otherMessage.isPublic) &&
+		(CoinSparkUint8ArrayToHex(this.hash.slice(0, hashCompareLen))==
+			CoinSparkUint8ArrayToHex(otherMessage.hash.slice(0, hashCompareLen)));
+}
+
+CoinSparkMessage.prototype.encode=function(countOutputs, metadataMaxLen)
+{
+	if (!this.isValid())
+		return null;
+
+//  4-character identifier
+
+	var metadata=CoinSparkASCIIToUint8Array(COINSPARK_METADATA_IDENTIFIER+COINSPARK_MESSAGE_PREFIX);
+
+//  Server host and path
+	
+	var array=this.encodeDomainAndOrPath(this.serverHost, this.useHttps, this.serverPath, this.usePrefix);
+	if (!array)
+		return null;
+
+	metadata=metadata.concat(array);
+
+//  Output ranges
+
+	if (this.isPublic) { // add public indicator first
+		var packing=((this.outputRanges.length>0) ? this.COINSPARK_OUTPUTS_MORE_FLAG : 0)|
+			this.COINSPARK_OUTPUTS_TYPE_EXTEND | this.COINSPARK_PACKING_EXTEND_PUBLIC;
+		metadata.push(packing);
+	}
+	
+	for (var index=0; index<this.outputRanges.length; index++) { // other output ranges
+		var outputRange=this.outputRanges[index];
+		
+		var packingResult=this.getOutputRangePacking(outputRange, countOutputs);
+		if (!packingResult)
+			return null;
+
+	//  The packing byte
+		
+		var packing=packingResult['packing'];
+
+		if ((index+1)<this.outputRanges.length)
+			packing|=this.COINSPARK_OUTPUTS_MORE_FLAG;
+
+		metadata.push(packing);
+
+	//  The index of the first output, if necessary
+
+		var written=this.writeUnsignedField(packingResult['firstBytes'], outputRange.first);
+		if (written===null)
+			return null;
+		
+		metadata=metadata.concat(written);
+
+	//  The number of outputs, if necessary
+		
+		written=this.writeUnsignedField(packingResult['countBytes'], outputRange.count);
+		if (written===null)
+			return null;
+		
+		metadata=metadata.concat(written);
+	}
+
+//  Message hash
+
+	metadata=metadata.concat(this.hash.slice(0, this.hashLen));
+
+//	Check the total length is within the specified limit
+
+	if (metadata.length>metadataMaxLen)
+		return null;
+		
+//	Return what we created
+
+	return metadata;
+}
+
+CoinSparkMessage.prototype.decode=function(metadata, countOutputs)
+{
+	var metadata=CoinSparkLocateMetadataRange(metadata, COINSPARK_MESSAGE_PREFIX);
+	if (!metadata)
+		return false;
+		
+//  Server host and path
+	
+	var decodedHostPath=this.shiftDecodeDomainAndOrPath(metadata, true, true);
+	if (!decodedHostPath)
+		return false;
+		
+	this.useHttps=decodedHostPath['useHttps'];
+	this.serverHost=decodedHostPath['domainName'];
+	this.usePrefix=decodedHostPath['usePrefix'];
+	this.serverPath=decodedHostPath['pagePath'];
+
+//  Output ranges
+
+	this.isPublic=false;
+	this.outputRanges=[];
+
+	do {
+
+	//  Read the next packing byte and check reserved bits are zero
+
+		var packing=metadata.shift();
+		if (typeof packing == 'undefined')
+			return false;
+
+		if (packing & this.COINSPARK_OUTPUTS_RESERVED_MASK)
+			return false;
+
+		var packingType=packing & this.COINSPARK_OUTPUTS_TYPE_MASK;
+		var packingValue=packing & this.COINSPARK_OUTPUTS_VALUE_MASK;
+
+		if ((packingType==this.COINSPARK_OUTPUTS_TYPE_EXTEND) && (packingValue==this.COINSPARK_PACKING_EXTEND_PUBLIC))
+			this.isPublic=true; // special case for public messages
+
+		else {
+
+		//  Create a new output range
+	
+			if (this.outputRanges.length>=COINSPARK_MESSAGE_MAX_IO_RANGES) // too many output ranges
+				return false;
+			
+			var firstBytes=0;
+			var countBytes=0;
+	
+		//  Decode packing byte
+	
+			if (packingType==this.COINSPARK_OUTPUTS_TYPE_SINGLE) { // inline single input
+				var outputRange=new CoinSparkIORange();
+				outputRange.first=packingValue;
+				outputRange.count=1;
+   
+			} else if (packingType==this.COINSPARK_OUTPUTS_TYPE_FIRST) { // inline first few outputs
+				var outputRange=new CoinSparkIORange();
+				outputRange.first=0;
+				outputRange.count=packingValue;
+		
+			} else if (packingType==this.COINSPARK_OUTPUTS_TYPE_EXTEND) { // we'll be taking additional bytes
+				var extendPackingType=this.decodePackingExtend(packingValue, true);
+				if (extendPackingType===null)
+					return false;
+				
+				var outputRange=this.packingTypeToValues(extendPackingType, null, countOutputs);
+
+				var getCounts=this.packingExtendAddByteCounts(packingValue, firstBytes, countBytes);
+				firstBytes=getCounts['firstBytes'];
+				countBytes=getCounts['countBytes'];
+		
+			} else
+				return false; // will be this.COINSPARK_OUTPUTS_TYPE_UNUSED
+	
+		//  The index of the first output and number of outputs, if necessary
+			
+			if (!this.shiftReadUnsignedField(metadata, firstBytes, outputRange, 'first'))
+				return false;
+				
+			if (!this.shiftReadUnsignedField(metadata, countBytes, outputRange, 'count'))
+				return false;
+			
+		//	Add on the new output range
+		
+			this.outputRanges[this.outputRanges.length]=outputRange;
+		}
+
+	} while
+		(packing & this.COINSPARK_OUTPUTS_MORE_FLAG);
+
+//  Message hash
+
+	this.hashLen=Math.min(metadata.length, COINSPARK_MESSAGE_HASH_MAX_LEN);
+	this.hash=metadata.splice(0, this.hashLen);
+
+//  Return validity
+
+	return this.isValid();
+}
+
+CoinSparkMessage.prototype.hasOutput=function(outputIndex)
+{
+	for (var rangeIndex=0; rangeIndex<this.outputRanges.length; rangeIndex++) {
+		outputRange=this.outputRanges[rangeIndex];
+		if ( (outputIndex>=outputRange.first) && (outputIndex<(outputRange.first+outputRange.count)) )
+			return true;
+	}
+
+	return false;
+}
+
+CoinSparkMessage.prototype.calcHashLen=function(countOutputs, metadataMaxLen)
+{
+	var hashLen=metadataMaxLen-COINSPARK_METADATA_IDENTIFIER_LEN-1;
+
+	var hostPathLen=this.serverPath.length+1;
+
+	if (this.readIPv4Address(this.serverHost))
+		hashLen-=5; // packing and IP octets
+	else {
+		hashLen-=1; // packing
+		hostPathLen+=this.shrinkLowerDomainName(this.serverHost).domainName.length+1;
+	}
+
+	hashLen-=2*Math.floor((hostPathLen+2)/3); // uses integer arithmetic
+
+	if (this.isPublic)
+		hashLen--;
+	
+	for (var rangeIndex=0; rangeIndex<this.outputRanges.length; rangeIndex++) {
+		var packingResult=this.getOutputRangePacking(this.outputRanges[rangeIndex], countOutputs);
+		if (packingResult)
+			hashLen-=(1+packingResult['firstBytes']+packingResult['countBytes']);
+	}
+
+	return Math.min(Math.max(hashLen, 0), COINSPARK_MESSAGE_HASH_MAX_LEN);
+}
+
+CoinSparkMessage.prototype.calcServerURL=function()
+{
+	return (
+		((this.useHttps) ? 'https' : 'http')+
+		'://'+this.serverHost+'/'+
+		(this.usePrefix ? 'coinspark/' : '')+
+		this.serverPath+
+		(this.serverPath.length ? '/' : '')
+	).toLowerCase();
+}
+
+CoinSparkMessage.prototype.getOutputRangePacking=function(outputRange, countOutputs)
+{
+	var packingOptions=this.getPackingOptions(null, outputRange, countOutputs, true);
+
+	var firstBytes=0;
+	var countBytes=0;
+
+	if (packingOptions['_1_0_BYTE'] && (outputRange.first<=this.COINSPARK_OUTPUTS_VALUE_MAX)) // inline single output
+		packing=this.COINSPARK_OUTPUTS_TYPE_SINGLE | (outputRange.first & this.COINSPARK_OUTPUTS_VALUE_MASK);
+
+	else if (packingOptions['_0_1_BYTE'] && (outputRange.count<=this.COINSPARK_OUTPUTS_VALUE_MAX)) // inline first few outputs
+		packing=this.COINSPARK_OUTPUTS_TYPE_FIRST | (outputRange.count & this.COINSPARK_OUTPUTS_VALUE_MASK);
+
+	else { // we'll be taking additional bytes
+		var packingExtend=this.encodePackingExtend(packingOptions);
+		if (packingExtend===null)
+			return null;
+
+		var packingResult=this.packingExtendAddByteCounts(packingExtend, firstBytes, countBytes);
+		firstBytes=packingResult['firstBytes'];
+		countBytes=packingResult['countBytes'];
+
+		packing=this.COINSPARK_OUTPUTS_TYPE_EXTEND | (packingExtend & this.COINSPARK_OUTPUTS_VALUE_MASK);
+	}
+
+	return {'packing':packing, 'firstBytes':firstBytes, 'countBytes':countBytes};
+}
+
+
 //	Class used internally for input or output ranges	
 
 function CoinSparkIORange()
@@ -2099,6 +2328,18 @@ CoinSparkIORange.prototype.match=function(otherInOutRange)
 function CoinSparkBase()
 {
 }
+
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_MASK=0x07;
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_0P=0x00; // index 0 only or previous (transfers only)
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_PUBLIC=0x00; // this is public (messages only)
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_1S=0x01; // index 1 only or subsequent single (transfers only)
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_0_1_BYTE=0x01; // starting at 0, 1 byte for count (messages only)
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_1_0_BYTE=0x02; // 1 byte for single index, count is 1
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_2_0_BYTES=0x03; // 2 bytes for single index, count is 1
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_1_1_BYTES=0x04; // 1 byte for first index, 1 byte for count
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_2_1_BYTES=0x05; // 2 bytes for first index, 1 byte for count
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_2_2_BYTES=0x06; // 2 bytes for first index, 2 bytes for count
+CoinSparkBase.prototype.COINSPARK_PACKING_EXTEND_ALL=0x07; // all inputs|outputs
 
 CoinSparkBase.prototype.isInteger=function(value)
 {
@@ -2543,6 +2784,218 @@ CoinSparkBase.prototype.shiftDecodeDomainAndOrPath=function(metadata, doDomainNa
 //  Finish and return
 
 	return result;
+}
+
+CoinSparkBase.prototype.normalizeIORanges=function(inRanges)
+{
+	var countRanges=inRanges.length;
+	if (countRanges==0)
+		return inRanges;
+		
+	var rangeUsed=CoinSparkArrayFill(0, countRanges, false);
+	var outRanges=[];
+	var countRemoved=0;
+
+	for (var orderIndex=0; orderIndex<countRanges; orderIndex++) {
+		var lowestRangeFirst=0;
+		var lowestRangeIndex=-1;
+
+		for (var rangeIndex=0; rangeIndex<countRanges; rangeIndex++)
+			if (!rangeUsed[rangeIndex])
+				if ( (lowestRangeIndex==-1) || (inRanges[rangeIndex].first<lowestRangeFirst) ) {
+					lowestRangeFirst=inRanges[rangeIndex].first;
+					lowestRangeIndex=rangeIndex;
+				}
+
+		if ((orderIndex>0) && (inRanges[lowestRangeIndex].first<=lastRangeEnd)) { // we can combine two adjacent ranges
+			countRemoved++;
+			thisRangeEnd=inRanges[lowestRangeIndex].first+inRanges[lowestRangeIndex].count;
+			outRanges[orderIndex-countRemoved].count=Math.max(lastRangeEnd, thisRangeEnd)-outRanges[orderIndex-countRemoved].first;
+
+		} else {
+			var newRange=new CoinSparkIORange();
+			newRange.first=inRanges[lowestRangeIndex].first;
+			newRange.count=inRanges[lowestRangeIndex].count;
+			outRanges[orderIndex-countRemoved]=newRange;
+		}
+	
+		lastRangeEnd=outRanges[orderIndex-countRemoved].first+outRanges[orderIndex-countRemoved].count;
+		rangeUsed[lowestRangeIndex]=true;
+	}
+
+	return outRanges;
+}
+
+CoinSparkBase.prototype.getPackingOptions=function(previousRange, range, countInputsOutputs, forMessages)
+{
+	var packingOptions={};
+	
+	var firstZero=(range.first==0);
+	var firstByte=(range.first<=COINSPARK_UNSIGNED_BYTE_MAX);
+	var first2Bytes=(range.first<=COINSPARK_UNSIGNED_2_BYTES_MAX);
+	var countOne=(range.count==1);
+	var countByte=(range.count<=COINSPARK_UNSIGNED_BYTE_MAX);
+	
+	if (forMessages) {
+		packingOptions['_0P']=false;
+		packingOptions['_1S']=false; // these two options not used for messages
+		packingOptions['_0_1_BYTE']=firstZero && countByte;
+	
+	} else {
+		if (previousRange) {
+			packingOptions['_0P']=(range.first==previousRange.first) && (range.count==previousRange.count);
+			packingOptions['_1S']=(range.first==(previousRange.first+previousRange.count)) && countOne;
+		
+		} else {
+			packingOptions['_0P']=firstZero && countOne;
+			packingOptions['_1S']=(range.first==1) && countOne;
+		}
+		
+		packingOptions['_0_1_BYTE']=false; // this option not used for transfers
+	}
+	
+	packingOptions['_1_0_BYTE']=firstByte && countOne;
+	packingOptions['_2_0_BYTES']=first2Bytes && countOne;
+	packingOptions['_1_1_BYTES']=firstByte && countByte;
+	packingOptions['_2_1_BYTES']=first2Bytes && countByte;
+	packingOptions['_2_2_BYTES']=first2Bytes && (range.count<=COINSPARK_UNSIGNED_2_BYTES_MAX);
+	packingOptions['_ALL']=firstZero && (range.count>=countInputsOutputs);
+	
+	return packingOptions;
+}
+
+CoinSparkBase.prototype.packingTypeToValues=function(packingType, previousRange, countInputOutputs)
+{
+	var range=new CoinSparkIORange();
+	
+	switch (packingType)
+	{
+		case '_0P':
+			if (previousRange) {
+				range.first=previousRange.first;
+				range.count=previousRange.count;
+			} else {
+				range.first=0;
+				range.count=1;
+			}
+			break;
+	
+		case '_1S':
+			if (previousRange)
+				range.first=previousRange.first+previousRange.count;
+			else
+				range.first=1;
+	
+			range.count=1;
+			break;
+			
+		case '_0_1_BYTE':
+			range.first=0;
+			break;
+	
+		case '_1_0_BYTE':
+		case '_2_0_BYTES':
+			range.count=1;
+			break;
+	
+		case '_ALL':
+			range.first=0;
+			range.count=countInputOutputs;
+			break;
+	}
+	
+	return range;
+}
+
+CoinSparkBase.prototype.packingExtendAddByteCounts=function(packingExtend, firstBytes, countBytes)
+{
+	switch (packingExtend)
+	{
+		case this.COINSPARK_PACKING_EXTEND_0_1_BYTE:
+			countBytes=1;
+			break;
+		
+		case this.COINSPARK_PACKING_EXTEND_1_0_BYTE:
+			firstBytes=1;
+			break;
+	
+		case this.COINSPARK_PACKING_EXTEND_2_0_BYTES:
+			firstBytes=2;
+			break;
+	
+		case this.COINSPARK_PACKING_EXTEND_1_1_BYTES:
+			firstBytes=1;
+			countBytes=1;
+			break;
+	
+		case this.COINSPARK_PACKING_EXTEND_2_1_BYTES:
+			firstBytes=2;
+			countBytes=1;
+			break;
+	
+		case this.COINSPARK_PACKING_EXTEND_2_2_BYTES:
+			firstBytes=2;
+			countBytes=2;
+			break;
+	}
+
+	return {'firstBytes':firstBytes, 'countBytes':countBytes};
+}
+
+CoinSparkBase.prototype.getPackingExtendMap=function()
+{
+	 return {
+		'_0P':this.COINSPARK_PACKING_EXTEND_0P,
+		'_1S':this.COINSPARK_PACKING_EXTEND_1S,
+		'_ALL':this.COINSPARK_PACKING_EXTEND_ALL,
+		'_1_0_BYTE':this.COINSPARK_PACKING_EXTEND_1_0_BYTE,
+		'_0_1_BYTE':this.COINSPARK_PACKING_EXTEND_0_1_BYTE,
+		'_2_0_BYTES':this.COINSPARK_PACKING_EXTEND_2_0_BYTES,
+		'_1_1_BYTES':this.COINSPARK_PACKING_EXTEND_1_1_BYTES,
+		'_2_1_BYTES':this.COINSPARK_PACKING_EXTEND_2_1_BYTES,
+		'_2_2_BYTES':this.COINSPARK_PACKING_EXTEND_2_2_BYTES
+	}; // in order of preference
+}
+
+CoinSparkBase.prototype.encodePackingExtend=function(packingOptions)
+{
+	var packingExtendMap=this.getPackingExtendMap();
+	
+	for (var packingType in packingExtendMap)
+		if (packingOptions[packingType])
+			return packingExtendMap[packingType];
+			
+	return null;
+}
+
+CoinSparkBase.prototype.decodePackingExtend=function(packingExtend, forMessages)
+{
+	var packingExtendMap=this.getPackingExtendMap();
+	
+	for (var packingType in packingExtendMap)
+		if (packingExtend==packingExtendMap[packingType])
+			if (packingType!=(forMessages ? '_1S' : '_0_1_BYTE')) // no _1S for messages, no _0_1_BYTE for transfers
+				return packingType;
+			
+	return null;
+}
+
+CoinSparkBase.prototype.writeUnsignedField=function(bytes, source)
+{
+	return (bytes>0) ? this.writeSmallEndianUnsigned(source, bytes) : []; // will return null on failure
+}
+
+CoinSparkBase.prototype.shiftReadUnsignedField=function(metadata, bytes, object, property)
+{
+	if (bytes>0) {
+		var value=this.shiftReadSmallEndianUnsigned(metadata.splice(0, bytes), bytes);
+		if (value===null)
+			return false;
+		
+		object[property]=value;
+	}
+	
+	return true;
 }
 
 
