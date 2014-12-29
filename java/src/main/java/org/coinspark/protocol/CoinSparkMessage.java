@@ -116,6 +116,20 @@ public class CoinSparkMessage extends CoinSparkBase{
     }
 
     /**
+     * Sets all components of the server URL
+     * 
+     * @param DomainPath 
+     */
+    
+    public void setDomainPath(CoinSparkDomainPath DomainPath)
+    {
+        serverHost=DomainPath.domainName;
+        serverPath=DomainPath.path;
+        useHttps=DomainPath.useHttps;
+        usePrefix=DomainPath.usePrefix;
+    }
+    
+    /**
      * Returns is public flag
      * 
      * @return is public flag
@@ -236,6 +250,17 @@ public class CoinSparkMessage extends CoinSparkBase{
         countOutputRanges = 0;
         hash = new byte[COINSPARK_MESSAGE_HASH_MAX_LEN]; 
         hashLen = 0; 
+    }
+    
+    /**
+     * Returns full URL of delivery server.
+     * 
+     * @return full URL of delivery server.
+     */
+    
+    public String getFullURL()
+    {
+        return (new CoinSparkDomainPath(serverHost, serverPath, useHttps, usePrefix)).getFullURL();
     }
     
     @Override
@@ -451,26 +476,6 @@ public class CoinSparkMessage extends CoinSparkBase{
     }
     
     /**
-     * Content part subclass.
-     * 
-     * All String parameters must be passed using UTF-8 encoding.
-     */    
-    
-    public class ContentPart
-    {
-        public String mimeType;
-        public String fileName;
-        public byte [] content=new byte[0];                
-    }
-    
-    /**
-     * Calculates the hash for the specific set of ContentParts
-     *
-     * 
-     * @return asset hash or null on failure
-    */
-    
-    /**
      * Calculates the hash for the specific set of ContentParts
      * 
      * @param salt  salt parameter
@@ -478,7 +483,7 @@ public class CoinSparkMessage extends CoinSparkBase{
      * @return message hash or null on failure
      */
     
-    public static byte [] calcMessageHash(byte [] salt, ContentPart [] messageParts)
+    public static byte [] calcMessageHash(byte [] salt, CoinSparkMessagePart [] messageParts)
     {
         if(salt == null)
         {
@@ -487,7 +492,7 @@ public class CoinSparkMessage extends CoinSparkBase{
         
         int bufferSize=16+salt.length+messageParts.length*3;
         
-        for(ContentPart part : messageParts)
+        for(CoinSparkMessagePart part : messageParts)
         {
             bufferSize += (part.mimeType != null) ? part.mimeType.getBytes().length : 0;
             bufferSize += (part.fileName != null) ? part.fileName.getBytes().length : 0;
@@ -502,7 +507,7 @@ public class CoinSparkMessage extends CoinSparkBase{
             System.arraycopy(salt, 0, buffer, offset, salt.length);
         }
         offset += salt.length+1;buffer[offset-1]=0x00;
-        for(ContentPart part : messageParts)
+        for(CoinSparkMessagePart part : messageParts)
         {
             if((part.mimeType != null) && (part.mimeType.length() > 0))
             {
@@ -576,10 +581,7 @@ public class CoinSparkMessage extends CoinSparkBase{
             
             if(result != null)
             {
-                if(result[0]>0)
-                {
-                    len -= (1 + result[1] +result[2]);
-                }
+                len -= (1 + result[1] +result[2]);
             }
         }        
         
