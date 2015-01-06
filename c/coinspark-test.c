@@ -1,7 +1,7 @@
 /*
- * CoinSpark 1.0 - C test suite
+ * CoinSpark 2.0 - C test suite
  *
- * Copyright (c) 2014 Coin Sciences Ltd
+ * Copyright (c) Coin Sciences Ltd
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,7 @@
 #define MAX_TRANSFERS 10
 #define MAX_INPUTS 5
 #define MAX_OUTPUTS 10
+#define MAX_MESSAGE_PARTS 5
 
 
 void DisplayHexadecimal(const void* hex, size_t length, FILE* file)
@@ -153,12 +154,12 @@ void DisplayRawData(void* data, size_t size, FILE* file)
     fprintf(file, "END RAW DATA\n\n");
 }
 
-void RandomizeGenesis(CoinSparkGenesis* genesis)
+void RandomizeDomainPath(char* domain, size_t domainMaxLen, int percentIPAddress, char* path, size_t pathMaxLen)
 {
-    size_t domainNameLen, pagePathLen;
-    int domainNamePos, pagePathPos;
+    int domainPos, pathPos;
+    size_t domainLen, pathLen;
     const char domainPathChars[]="0123456789abcdefghijklmnopqrstuvwxyz-";
-    const char* domainNameSuffixes[]={
+    const char* domainSuffixes[]={
         ".at",
         ".au",
         ".be",
@@ -220,6 +221,33 @@ void RandomizeGenesis(CoinSparkGenesis* genesis)
         ".vn"
     };
     
+    if ((rand()%100)<percentIPAddress)
+        sprintf(domain, "%d.%d.%d.%d", rand()%256, rand()%256, rand()%256, rand()%256);
+    
+    else {
+        if (rand()%2)
+            strcpy(domain, "www.");
+        else
+            *domain=0;
+        
+        domainPos=(int)strlen(domain);
+        domainLen=domainPos+2+rand()%(domainMaxLen-12);
+        for (; domainPos<domainLen; domainPos++)
+            domain[domainPos]=domainPathChars[rand()%(sizeof(domainPathChars)-1)];
+        domain[domainLen]=0x00;
+        
+        if (rand()%3)
+            strcat(domain, domainSuffixes[rand()%(sizeof(domainSuffixes)/sizeof(*domainSuffixes))]);
+    }
+
+    pathLen=rand()%(1+pathMaxLen);
+    for (pathPos=0; pathPos<pathLen; pathPos++)
+        path[pathPos]=domainPathChars[rand()%(sizeof(domainPathChars)-1)];
+    path[pathLen]=0x00;
+}
+
+void RandomizeGenesis(CoinSparkGenesis* genesis)
+{
     CoinSparkGenesisClear(genesis);
     
     genesis->qtyMantissa=1+rand()%COINSPARK_GENESIS_QTY_MANTISSA_MAX;
@@ -245,32 +273,10 @@ void RandomizeGenesis(CoinSparkGenesis* genesis)
     
 tryDomainPathAgain:
     
-    if (rand()%8) {
-        if (rand()%2)
-            strcpy(genesis->domainName, "www.");
-        else
-            *genesis->domainName=0;
-        
-        domainNamePos=(int)strlen(genesis->domainName);
-        domainNameLen=domainNamePos+2+rand()%(COINSPARK_GENESIS_DOMAIN_NAME_MAX_LEN-12);
-        for (; domainNamePos<domainNameLen; domainNamePos++)
-            genesis->domainName[domainNamePos]=domainPathChars[rand()%(sizeof(domainPathChars)-1)];
-        genesis->domainName[domainNameLen]=0x00;
-        
-        if (rand()%3)
-            strcat(genesis->domainName, domainNameSuffixes[rand()%(sizeof(domainNameSuffixes)/sizeof(*domainNameSuffixes))]);
-    
-    } else
-        sprintf(genesis->domainName, "%d.%d.%d.%d", rand()%256, rand()%256, rand()%256, rand()%256);
-    
     genesis->useHttps=(rand()%2) ? TRUE : FALSE;
-    
-    pagePathLen=rand()%(1+COINSPARK_GENESIS_PAGE_PATH_MAX_LEN);
-    for (pagePathPos=0; pagePathPos<pagePathLen; pagePathPos++)
-        genesis->pagePath[pagePathPos]=domainPathChars[rand()%(sizeof(domainPathChars)-1)];
-    genesis->pagePath[pagePathLen]=0x00;
-    
     genesis->usePrefix=(rand()%2) ? TRUE : FALSE;
+    
+    RandomizeDomainPath(genesis->domainName, COINSPARK_GENESIS_DOMAIN_NAME_MAX_LEN, 10, genesis->pagePath, COINSPARK_GENESIS_PAGE_PATH_MAX_LEN);
     
     genesis->assetHashLen=CoinSparkGenesisCalcHashLen(genesis, MAX_OP_RETURN_LEN);
     
@@ -316,10 +322,10 @@ void RandomizeAssetRef(CoinSparkAssetRef* assetRef)
 
 void RandomizeInOutRange(CoinSparkIORange* range, const CoinSparkIORange* previousRange, int countInputsOutputs)
 {
-    int version=rand()%8;
+    int version=rand()%9;
     
     switch (version) {
-        case 0:
+        case 0: // _0P
             if (previousRange)
                 *range=*previousRange;
             else {
@@ -328,7 +334,7 @@ void RandomizeInOutRange(CoinSparkIORange* range, const CoinSparkIORange* previo
             }
             break;
             
-        case 1:
+        case 1: // _1S
             if (previousRange)
                 range->first=previousRange->first+previousRange->count;
             else
@@ -337,34 +343,39 @@ void RandomizeInOutRange(CoinSparkIORange* range, const CoinSparkIORange* previo
             range->count=1;
             break;
             
-        case 2:
-            range->first=rand() % COINSPARK_MIN(0xFF, countInputsOutputs);
-            range->count=1;
-            break;
-            
-        case 3:
-            range->first=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs);
-            range->count=1;
-            break;
-            
-        case 4:
-            range->first=rand() % COINSPARK_MIN(0xFF, countInputsOutputs);
-            range->count=rand() % COINSPARK_MIN(0xFF, countInputsOutputs-range->first);
-            break;
-            
-        case 5:
-            range->first=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs);
-            range->count=rand() % COINSPARK_MIN(0xFF, countInputsOutputs-range->first);
-            break;
-            
-        case 6:
-            range->first=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs);
-            range->count=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs-range->first);
-            break;
-            
-        case 7:
+        case 2: // _ALL
             range->first=0;
             range->count=countInputsOutputs;
+            break;
+            
+        case 3: // _1_0_BYTE
+            range->first=rand() % COINSPARK_MIN(0xFF, countInputsOutputs);
+            range->count=1;
+            break;
+            
+        case 4: // _0_1_BYTE
+            range->first=0;
+            range->count=rand() % COINSPARK_MIN(0xFF, countInputsOutputs);
+            break;
+            
+        case 5: // _2_0_BYTES
+            range->first=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs);
+            range->count=1;
+            break;
+            
+        case 6: // _1_1_BYTES
+            range->first=rand() % COINSPARK_MIN(0xFF, countInputsOutputs);
+            range->count=rand() % COINSPARK_MIN(0xFF, countInputsOutputs-range->first);
+            break;
+            
+        case 7: // _2_1_BYTES
+            range->first=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs);
+            range->count=rand() % COINSPARK_MIN(0xFF, countInputsOutputs-range->first);
+            break;
+            
+        case 8: // _2_2_BYTES
+            range->first=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs);
+            range->count=rand() % COINSPARK_MIN(0xFFFF, countInputsOutputs-range->first);
             break;
     }
     
@@ -378,11 +389,11 @@ void RandomizeInOutRange(CoinSparkIORange* range, const CoinSparkIORange* previo
         range->first=countInputsOutputs-range->count;
 }
 
-void RandomizeTransfer(CoinSparkTransfer* transfer, const CoinSparkTransfer* previousTransfer, int countInputs, int countOutputs)
+void RandomizeTransfer(CoinSparkTransfer* transfer, const CoinSparkTransfer* previousTransfer, int percentDefaultRoute, int countInputs, int countOutputs)
 {
     CoinSparkTransferClear(transfer);
     
-    if ((rand()%8)==0) // make it a default route
+    if ((rand()%100)<percentDefaultRoute) // make it a default route
         transfer->assetRef.blockNum=COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE;
     else if (previousTransfer && (rand()&1) ) // use same as previous
         transfer->assetRef=previousTransfer->assetRef;
@@ -398,6 +409,36 @@ void RandomizeTransfer(CoinSparkTransfer* transfer, const CoinSparkTransfer* pre
         
     } else
         transfer->qtyPerOutput=RandomizeAssetQty(previousTransfer);
+}
+
+bool RandomizeMessage(CoinSparkMessage* message, int countOutputs, size_t metadataMaxLen)
+{ // returns whether successful or not, given space provided
+    
+    int outputRangeIndex, minOutputRanges;
+    
+    CoinSparkMessageClear(message);
+    
+    message->useHttps=(rand()%2) ? TRUE : FALSE;
+    message->usePrefix=(rand()%2) ? TRUE : FALSE;
+    message->isPublic=(rand()%2) ? TRUE : FALSE;
+    minOutputRanges=message->isPublic ? 0 : 1;
+    
+    RandomizeDomainPath(message->serverHost, COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN, 50, message->serverPath, COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN);
+    
+    message->countOutputRanges=minOutputRanges+rand()%COINSPARK_MESSAGE_MAX_IO_RANGES;
+    
+    for (outputRangeIndex=0; outputRangeIndex<message->countOutputRanges; outputRangeIndex++)
+        RandomizeInOutRange(message->outputRanges+outputRangeIndex, NULL, countOutputs);
+    
+    RandomizeRawData(message->hash, COINSPARK_MESSAGE_HASH_MAX_LEN);
+
+    for (; message->countOutputRanges>=minOutputRanges; message->countOutputRanges--) {
+        message->hashLen=CoinSparkMessageCalcHashLen(message, countOutputs, metadataMaxLen);
+        if (message->hashLen>=COINSPARK_MESSAGE_HASH_MIN_LEN)
+            return TRUE;
+    }
+    
+    return FALSE;
 }
 
 void RandomizeReadableString(char* string, size_t stringMaxLen, bool padding)
@@ -448,6 +489,14 @@ void DisturbString(char* string)
             bit|=1<<(rand()%8);
         ((unsigned char*)string)[rand()%length]^=bit;
     }
+}
+
+void DisturbIORange(CoinSparkIORange* range)
+{
+    if (rand()%2)
+        range->first^=1;
+    else
+        range->count^=1;
 }
 
 void DisturbInteger16(int16_t* integer)
@@ -573,7 +622,7 @@ bool PerformAddressTests(char* directoryName, int countTests, bool toDisplay)
             fprintf(inputFile, "%s\n", encodeString);
         
         if (outputFile)
-            fprintf(outputFile, "%s", debugString);
+            fputs(debugString, outputFile);
         
         FlushTestFiles(inputFile, outputFile);
 
@@ -664,7 +713,7 @@ bool PerformAssetRefTests(char* directoryName, int countTests, bool toDisplay)
             fprintf(inputFile, "%s\n", encodeString);
         
         if (outputFile)
-            fprintf(outputFile, "%s", debugString);
+            fputs(debugString, outputFile);
         
         FlushTestFiles(inputFile, outputFile);
 
@@ -704,12 +753,24 @@ bool PerformAssetRefTests(char* directoryName, int countTests, bool toDisplay)
 bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
 {
     typedef enum {
-        genesis,
-        paymentRef,
-        paymentRefTransfers,
-        transfers,
-        metadataTestTypes
+        partGenesis=1,
+        partPaymentRef=2,
+        partTransfers=4,
+        partMessage=8
     } MetadataTestType;
+    
+//  Encoding order when combined: genesis (always on its own), paymentRef, transfers, message
+    
+    MetadataTestType metadataTest[]={ // list of possible combinations to test
+        partGenesis,
+        partPaymentRef,
+        partPaymentRef | partTransfers,
+    //  partPaymentRef | partTransfers | partMessage, // doable but only with rare values
+        partPaymentRef | partMessage,
+        partTransfers,
+        partTransfers | partMessage,
+        partMessage,
+    };
     
     char testName[]="Script";
     FILE *inputFile, *outputFile;
@@ -717,8 +778,9 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
     CoinSparkGenesis encodeGenesis, decodedGenesis;
     CoinSparkPaymentRef encodePaymentRef, decodedPaymentRef;
     CoinSparkTransfer encodeTransfers[MAX_TRANSFERS], decodedTransfers[MAX_TRANSFERS], *disturbTransfer;
-    char debugString[1024*MAX_TRANSFERS], metadata[MAX_OP_RETURN_LEN], decodeMetadata[MAX_OP_RETURN_LEN], scriptPubKey[2*MAX_OP_RETURN_LEN+16], appendMetadata[MAX_OP_RETURN_LEN];
-    int rounding, transferIndex, countInputs, countOutputs, countEncodeTransfers, countDecodedTransfers;
+    CoinSparkMessage encodeMessage, decodedMessage;
+    char debugString[16384], metadata[MAX_OP_RETURN_LEN], decodeMetadata[MAX_OP_RETURN_LEN], scriptPubKey[2*MAX_OP_RETURN_LEN+16], appendMetadata[MAX_OP_RETURN_LEN];
+    int rounding, maxTransfers, transferIndex, countInputs, countOutputs, countEncodeTransfers, countDecodedTransfers, attempts;
     size_t metadataLen, scriptPubKeyLen, metadataMaxLen, appendMetadataLen;
     bool mustFillMetadata;
     
@@ -726,23 +788,21 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
         return FALSE;
     
     while (countTests-->0) {
-        testType=rand()%metadataTestTypes;
+        testType=metadataTest[rand()%(sizeof(metadataTest)/sizeof(*metadataTest))];
+        attempts=0;
+        
+    tryThisTestAgain:
+        attempts++;
         metadataLen=0;
         mustFillMetadata=FALSE;
     
     //  Encoding...
         
         countInputs=1+rand()%(COINSPARK_IO_INDEX_MAX>>(rand()%14));
-        countOutputs=2+rand()%(COINSPARK_IO_INDEX_MAX>>(rand()%14));
+        countOutputs=1+rand()%(COINSPARK_IO_INDEX_MAX>>(rand()%14));
         
-        if (testType==genesis) {
+        if (testType&partGenesis) {
             RandomizeGenesis(&encodeGenesis);
-
-            CoinSparkGenesisToString(&encodeGenesis, debugString, sizeof(debugString));
-            if (toDisplay)
-                fputs(debugString, stdout);
-            if (outputFile)
-                fprintf(outputFile, "%s", debugString);
 
             metadataLen=CoinSparkGenesisEncode(&encodeGenesis, metadata, sizeof(metadata));
             
@@ -750,49 +810,104 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
                 mustFillMetadata=TRUE;
         }
         
-        if ( (testType==paymentRef) || (testType==paymentRefTransfers) ) {
+        if (testType&partPaymentRef) {
             encodePaymentRef=CoinSparkPaymentRefRandom();
+            encodePaymentRef>>=(rand()%48);
 
-            CoinSparkPaymentRefToString(encodePaymentRef, debugString, sizeof(debugString));
-            if (toDisplay)
-                fputs(debugString, stdout);
-            if (outputFile)
-                fprintf(outputFile, "%s", debugString);
-            
             metadataLen=CoinSparkPaymentRefEncode(encodePaymentRef, metadata, sizeof(metadata));
         }
         
-        if ( (testType==transfers) || (testType==paymentRefTransfers) ) {
-            if (testType==paymentRefTransfers)
+        if (testType&partTransfers) {
+            if (metadataLen>0)
                 metadataMaxLen=CoinSparkMetadataMaxAppendLen(metadata, metadataLen, sizeof(metadata));
             else
                 metadataMaxLen=sizeof(metadata);
             
-            for (transferIndex=0; transferIndex<MAX_TRANSFERS; transferIndex++)
-                RandomizeTransfer(encodeTransfers+transferIndex, (transferIndex>0) ? (encodeTransfers+rand()%transferIndex) : NULL,
-                                  countInputs, countOutputs);
+            maxTransfers=(testType&partMessage) ? 1 : MAX_TRANSFERS;
             
-            for (countEncodeTransfers=MAX_TRANSFERS; countEncodeTransfers>0; countEncodeTransfers--) {
+            for (transferIndex=0; transferIndex<maxTransfers; transferIndex++)
+                RandomizeTransfer(encodeTransfers+transferIndex, (transferIndex>0) ? (encodeTransfers+rand()%transferIndex) : NULL,
+                                  (maxTransfers==1) ? 0 : 10, countInputs, countOutputs);
+            
+            for (countEncodeTransfers=maxTransfers; countEncodeTransfers>0; countEncodeTransfers--) {
                 appendMetadataLen=CoinSparkTransfersEncode(encodeTransfers, countEncodeTransfers, countInputs, countOutputs,
-                    (testType==paymentRefTransfers) ? appendMetadata : metadata, metadataMaxLen);
+                    (metadataLen>0) ? appendMetadata : metadata, metadataMaxLen);
                 
                 if (appendMetadataLen>0) // we have enough space so stop reducing
                     break;
             }
             
-            CoinSparkTransfersToString(encodeTransfers, countEncodeTransfers, debugString, sizeof(debugString));
-            if (toDisplay)
-                fputs(debugString, stdout);
-            if (outputFile)
-                fprintf(outputFile, "%s", debugString);
-            
-            if (testType==paymentRefTransfers)
+            if (metadataLen>0)
                 metadataLen=CoinSparkMetadataAppend(metadata, metadataLen, sizeof(metadata), appendMetadata, appendMetadataLen);
             else
                 metadataLen=appendMetadataLen;
         }
         
-    //  Displaying and global checks
+        if (testType&partMessage) {
+            if (metadataLen>0)
+                metadataMaxLen=CoinSparkMetadataMaxAppendLen(metadata, metadataLen, sizeof(metadata));
+            else
+                metadataMaxLen=sizeof(metadata);
+            
+            if (RandomizeMessage(&encodeMessage, countOutputs, metadataMaxLen)) {
+                appendMetadataLen=CoinSparkMessageEncode(&encodeMessage, countOutputs, (metadataLen>0) ? appendMetadata : metadata, metadataMaxLen);
+                if (!appendMetadataLen) {
+                    printf("Failed to encode message!\n\n");
+                    return FALSE;
+                }
+                
+                if (metadataLen>0)
+                    metadataLen=CoinSparkMetadataAppend(metadata, metadataLen, sizeof(metadata), appendMetadata, appendMetadataLen);
+                else
+                    metadataLen=appendMetadataLen;
+                
+                if (encodeMessage.hashLen<COINSPARK_MESSAGE_HASH_MAX_LEN)
+                    mustFillMetadata=TRUE;
+
+            } else
+                goto tryThisTestAgain; // we don't have space for any message so have another try
+        }
+    
+    //  Display encoded data and outputting it to file
+        
+        if (toDisplay || outputFile) {
+            if (toDisplay)
+                printf("After %d attempt%s...\n\n", attempts, (attempts==1) ? "" : "s");
+
+            if (testType&partGenesis) {
+                CoinSparkGenesisToString(&encodeGenesis, debugString, sizeof(debugString));
+                if (toDisplay)
+                    fputs(debugString, stdout);
+                if (outputFile)
+                    fputs(debugString, outputFile);
+            }
+            
+            if (testType&partPaymentRef) {
+                CoinSparkPaymentRefToString(encodePaymentRef, debugString, sizeof(debugString));
+                if (toDisplay)
+                    fputs(debugString, stdout);
+                if (outputFile)
+                    fputs(debugString, outputFile);
+            }
+            
+            if (testType&partTransfers) {
+                CoinSparkTransfersToString(encodeTransfers, countEncodeTransfers, debugString, sizeof(debugString));
+                if (toDisplay)
+                    fputs(debugString, stdout);
+                if (outputFile)
+                    fputs(debugString, outputFile);
+            }
+            
+            if (testType&partMessage) {
+                CoinSparkMessageToString(&encodeMessage, debugString, sizeof(debugString));
+                if (toDisplay)
+                    fputs(debugString, stdout);
+                if (outputFile)
+                    fputs(debugString, outputFile);
+            }
+        }
+
+    //  Displaying raw data and global checks
         
         if (!metadataLen) {
             printf("Failed to encode metadata!\n\n");
@@ -856,7 +971,7 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
         
     //  Decoding...
         
-        if (testType==genesis) {
+        if (testType&partGenesis) {
             if (!CoinSparkGenesisDecode(&decodedGenesis, metadata, metadataLen)) {
                 printf("Failed to decode genesis!\n\n");
                 return FALSE;
@@ -891,7 +1006,7 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
                 printf("Successful match of genesis.\n");
          }
 
-        if ( (testType==paymentRef) || (testType==paymentRefTransfers) ) {
+        if (testType&partPaymentRef) {
             if (!CoinSparkPaymentRefDecode(&decodedPaymentRef, metadata, metadataLen)) {
                 printf("Failed to decode payment reference!\n\n");
                 return FALSE;
@@ -909,7 +1024,7 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
                 printf("Successful match of payment reference.\n");
         }
         
-        if ( (testType==transfers) || (testType==paymentRefTransfers) ) {
+        if (testType&partTransfers) {
             countDecodedTransfers=CoinSparkTransfersDecodeCount(metadata, metadataLen);
             
             if (countDecodedTransfers!=countEncodeTransfers) {
@@ -941,6 +1056,29 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
             } else if (toDisplay)
                 printf("Successful match of transfers.\n");
         }
+        
+        if (testType&partMessage) {
+            if (!CoinSparkMessageDecode(&decodedMessage, countOutputs, metadata, metadataLen)) {
+                printf("Failed to decode message!\n\n");
+                return FALSE;
+            }
+        
+            if (!CoinSparkMessageMatch(&encodeMessage, &encodeMessage, TRUE)) {
+                printf("Encoded message does not itself:\n\n");
+                return FALSE;
+            }
+
+            if (!CoinSparkMessageMatch(&encodeMessage, &decodedMessage, FALSE)) {
+                printf("Decoded message does not match:\n\n");
+                
+                CoinSparkMessageToString(&decodedMessage, debugString, sizeof(debugString));
+                fputs(debugString, stdout);
+               
+                return FALSE;
+
+            } else if (toDisplay)
+                printf("Successful match of message.\n");
+        }
 
         if (toDisplay)
             printf("All metadata decoding passed.\n\n");
@@ -949,7 +1087,7 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
         
     //  Disturbance tests for matching
         
-        if (testType==genesis) {
+        if (testType&partGenesis) {
             decodedGenesis=encodeGenesis;
             
             disturbGenesisOther:
@@ -1005,7 +1143,7 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
             }
         }
         
-        if ( (testType==transfers) || (testType==paymentRefTransfers) ) {
+        if (testType&partTransfers) {
             disturbTransferOther:
 
             disturbTransfer=decodedTransfers+rand()%countDecodedTransfers;
@@ -1068,7 +1206,67 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
                 fputs(debugString, stdout);
                 
                 return FALSE;
-           }
+            }
+            
+            if (testType&partMessage) {
+                disturbMessageOther:
+                
+                decodedMessage=encodeMessage;
+                
+                switch (rand()%8) {
+                    case 0:
+                        decodedMessage.useHttps=!decodedMessage.useHttps;
+                        break;
+                        
+                    case 1:
+                        DisturbString(decodedMessage.serverHost);
+                        break;
+                        
+                    case 2:
+                        decodedMessage.usePrefix=!decodedMessage.usePrefix;
+                        break;
+                        
+                    case 3:
+                        if (decodedMessage.serverPath[0])
+                            DisturbString(decodedMessage.serverPath);
+                        else
+                            goto disturbMessageOther;
+                        break;
+                        
+                    case 4:
+                        decodedMessage.isPublic=!decodedMessage.isPublic;
+                        break;
+                        
+                    case 5:
+                        if (decodedMessage.countOutputRanges>0)
+                            decodedMessage.countOutputRanges--;
+                        else
+                            goto disturbMessageOther;
+                        break;
+                        
+                    case 6:
+                        if (decodedMessage.countOutputRanges>0)
+                            DisturbIORange(decodedMessage.outputRanges+rand()%decodedMessage.countOutputRanges);
+                        else
+                            goto disturbMessageOther;
+                        break;
+                        
+                    case 7:
+                        DisturbRawData(decodedMessage.hash, decodedMessage.hashLen);
+                        break;
+                }
+                
+                if (CoinSparkMessageMatch(&encodeMessage, &decodedMessage, TRUE)) {
+                    printf("Disturbed message should not match!\n\n");
+                    
+                    CoinSparkMessageToString(&encodeMessage, debugString, sizeof(debugString));
+                    fputs(debugString, stdout);
+                    CoinSparkMessageToString(&decodedMessage, debugString, sizeof(debugString));
+                    fputs(debugString, stdout);
+                
+                //    return FALSE;
+                }
+            }
         }
         
     }
@@ -1080,7 +1278,7 @@ bool PerformScriptTests(char* directoryName, int countTests, bool toDisplay)
 
 bool PerformAssetHashTests(char* directoryName, int countTests, bool toDisplay)
 {
-    char testName[]="Hash";
+    char testName[]="AssetHash";
     FILE *inputFile, *outputFile;
     char name[32], issuer[32], description[256], units[8], issueDate[16], expiryDate[16], contractContent[1024];
     double interestRate, multiple;
@@ -1335,7 +1533,7 @@ bool PerformTransferTests(char* directoryName, int countTests, bool toDisplay)
         
         for (transferIndex=0; transferIndex<MAX_TRANSFERS; transferIndex++) {
             RandomizeTransfer(encodeTransfers+transferIndex, (transferIndex>0) ? (encodeTransfers+rand()%transferIndex) : NULL,
-                              countInputs, countOutputs);
+                              20, countInputs, countOutputs);
             if (rand()%5)
                 encodeTransfers[transferIndex].assetRef=assetRef; // 80% of them will be related to this asset
         }
@@ -1550,6 +1748,65 @@ bool PerformTransferTests(char* directoryName, int countTests, bool toDisplay)
     return TRUE;
 }
 
+bool PerformMessageHashTests(char* directoryName, int countTests, bool toDisplay)
+{
+    char testName[]="MessageHash";
+    FILE *inputFile, *outputFile;
+    char salt[32], mimeType[MAX_MESSAGE_PARTS][32], fileName[MAX_MESSAGE_PARTS][32], content[MAX_MESSAGE_PARTS][1024];
+    CoinSparkMessagePart messageParts[MAX_MESSAGE_PARTS];
+    int partIndex, countParts;
+    unsigned char messageHash[32];
+    
+    if (!StartTests(&inputFile, &outputFile, directoryName, testName, countTests))
+        return FALSE;
+    
+    while (countTests-->0) {
+        countParts=1+rand()%MAX_MESSAGE_PARTS;
+        RandomizeReadableString(salt, sizeof(salt), FALSE);
+        
+        for (partIndex=0; partIndex<countParts; partIndex++) {
+            RandomizeReadableString(mimeType[partIndex], sizeof(mimeType[partIndex]), FALSE);
+
+            if (rand()%2)
+                RandomizeReadableString(fileName[partIndex], sizeof(fileName[partIndex]), FALSE);
+            else
+                fileName[partIndex][0]=0x00;
+            
+            RandomizeReadableString(content[partIndex], sizeof(content[partIndex]), FALSE);
+            
+            messageParts[partIndex].mimeType=mimeType[partIndex];
+            messageParts[partIndex].mimeTypeLen=strlen(mimeType[partIndex]);
+            messageParts[partIndex].fileName=fileName[partIndex];
+            messageParts[partIndex].fileNameLen=strlen(fileName[partIndex]);
+            messageParts[partIndex].content=(unsigned char*)content[partIndex];
+            messageParts[partIndex].contentLen=strlen(content[partIndex]);
+        }
+        
+        CoinSparkCalcMessageHash((unsigned char*)salt, strlen(salt), messageParts, countParts, messageHash);
+        
+        if (inputFile) {
+            fprintf(inputFile, "%s # salt\n%d # parts\n", salt, countParts);
+            
+            for (partIndex=0; partIndex<countParts; partIndex++)
+                fprintf(inputFile, "%s # part %d mime type\n%s # part %d file name\n%s # part %d content\n",
+                        mimeType[partIndex], partIndex, fileName[partIndex], partIndex, content[partIndex], partIndex);
+            
+            fputc('\n', inputFile);
+        }
+        
+        if (outputFile) {
+            DisplayHexadecimal(messageHash, sizeof(messageHash), outputFile);
+            fputc('\n', outputFile);
+        }
+        
+        FlushTestFiles(inputFile, outputFile);
+    }
+    
+    FinishTests(inputFile, outputFile, testName);
+    
+    return TRUE;
+}
+
 int main(int argc, const char* argv[])
 {
 	time_t timeStamp;
@@ -1570,6 +1827,7 @@ int main(int argc, const char* argv[])
     printf("Asset [H]ashes\n");
     printf("[G]enesis calculations\n");
     printf("[T]ransfer calculations\n");
+    printf("[M]essage hashes\n");
     printf("\nChoose a test suite to run [all]: ");
     if (fgets(buffer, sizeof(buffer), stdin)) {
         newLinePtr=strchr(buffer, '\n');
@@ -1577,7 +1835,8 @@ int main(int argc, const char* argv[])
             *newLinePtr=0x00;
         
         testSuite=tolower(buffer[0]);
-    }
+    } else
+        return EXIT_FAILURE;
     
 //  Ask the user how many tests
     
@@ -1651,7 +1910,11 @@ int main(int argc, const char* argv[])
     if ((testSuite=='t') || (testSuite==0x00))
         if (!PerformTransferTests(toFiles ? directoryName : NULL, countTests, toDisplay))
             goto testFailed;
-    
+
+    if ((testSuite=='m') || (testSuite==0x00))
+        if (!PerformMessageHashTests(toFiles ? directoryName : NULL, countTests, toDisplay))
+            goto testFailed;
+
 //  Finish up
     
     return EXIT_SUCCESS;

@@ -1,9 +1,9 @@
 <?php
 
 /*
- * CoinSpark 1.0 - PHP library
+ * CoinSpark 2.0 - PHP library
  *
- * Copyright (c) 2014 Coin Sciences Ltd
+ * Copyright (c) Coin Sciences Ltd
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -53,11 +53,19 @@
 	define('COINSPARK_ASSETREF_TXID_PREFIX_LEN', 2);
 
 	define('COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE', -1); // magic number for a default route
+	
+	define('COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN', 32);
+	define('COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN', 24);
+	define('COINSPARK_MESSAGE_HASH_MIN_LEN', 12);
+	define('COINSPARK_MESSAGE_HASH_MAX_LEN', 32);
+	define('COINSPARK_MESSAGE_MAX_IO_RANGES', 16);
 
 	define('COINSPARK_IO_INDEX_MAX', 65535);
 	
 	define('COINSPARK_ADDRESS_FLAG_ASSETS', 1);
 	define('COINSPARK_ADDRESS_FLAG_PAYMENT_REFS', 2);
+	define('COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES', 4);
+	define('COINSPARK_ADDRESS_FLAG_FILE_MESSAGES', 8);
 	define('COINSPARK_ADDRESS_FLAG_MASK', 0x7FFFFF); // 23 bits are currently usable
 
 
@@ -74,6 +82,7 @@
 	define('COINSPARK_GENESIS_PREFIX', 'g');
 	define('COINSPARK_TRANSFERS_PREFIX', 't');
 	define('COINSPARK_PAYMENTREF_PREFIX', 'r');
+	define('COINSPARK_MESSAGE_PREFIX', 'm');
 
 	define('COINSPARK_FEE_BASIS_MAX_SATOSHIS', 1000);
 
@@ -311,7 +320,7 @@
     }
     
     
-//	Function for calculating asset hashes
+//	Function for calculating hashes
     
 	/**
 	 * Calculates the assetHash for the key information from a CoinSpark asset web page JSON specification.
@@ -351,6 +360,16 @@
 		
 		$buffer.=$contractContent."\x00";
 		
+		return hash('sha256', $buffer, true);
+	}
+	
+	function CoinSparkCalcMessageHash($salt, $messageParts)
+	{
+		$buffer=$salt."\x00";
+		
+		foreach ($messageParts as $messagePart)
+			$buffer.=$messagePart['mimeType']."\x00".@$messagePart['fileName']."\x00".$messagePart['content']."\x00";
+			
 		return hash('sha256', $buffer, true);
 	}
 	
@@ -395,6 +414,8 @@
 			$flagsToStrings=array(
 				COINSPARK_ADDRESS_FLAG_ASSETS => "assets",
 				COINSPARK_ADDRESS_FLAG_PAYMENT_REFS => "payment references",
+				COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES => "text messages",
+				COINSPARK_ADDRESS_FLAG_FILE_MESSAGES => "file messages",
 			);
 			
 			$buffer="COINSPARK ADDRESS\n";
@@ -946,7 +967,7 @@
 		//	Asset hash
 		
 			$this->assetHashLen=min(strlen($metadata), COINSPARK_GENESIS_HASH_MAX_LEN);
-			$this->assetHash=$this->stringShift($metadata, $this->assetHashLen);
+			$this->assetHash=$this->stringShift($metadata, $this->assetHashLen); // insufficient length will be caught by isValid()
 			
 		//	Return validity
 		
@@ -1133,16 +1154,6 @@
 		const COINSPARK_PACKING_EXTEND_INPUTS_SHIFT=3;
 		const COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT=0;
 
-		const COINSPARK_PACKING_EXTEND_MASK=0x07;
-		const COINSPARK_PACKING_EXTEND_0P=0x00; // index 0 only or previous
-		const COINSPARK_PACKING_EXTEND_1S=0x01; // index 1 only or subsequent single
-		const COINSPARK_PACKING_EXTEND_BYTE=0x02; // 1 byte for single index
-		const COINSPARK_PACKING_EXTEND_2_BYTES=0x03; // 2 bytes for single index
-		const COINSPARK_PACKING_EXTEND_1_1_BYTES=0x04; // 1 byte for first index, 1 byte for count
-		const COINSPARK_PACKING_EXTEND_2_1_BYTES=0x05; // 2 bytes for first index, 1 byte for count
-		const COINSPARK_PACKING_EXTEND_2_2_BYTES=0x06; // 2 bytes for first index, 2 bytes for count
-		const COINSPARK_PACKING_EXTEND_ALL=0x07; // all inputs|outputs
-
 		const COINSPARK_PACKING_QUANTITY_MASK=0x07;
 		const COINSPARK_PACKING_QUANTITY_1P=0x00; // quantity=1 or previous
 		const COINSPARK_PACKING_QUANTITY_1_BYTE=0x01;
@@ -1238,8 +1249,8 @@
 				
 		//	Packing for input and output indices
 		
-			$inputPackingOptions=$this->getPackingOptions(@$previousTransfer->inputs, $this->inputs, $countInputs);
-			$outputPackingOptions=$this->getPackingOptions(@$previousTransfer->outputs, $this->outputs, $countOutputs);
+			$inputPackingOptions=$this->getPackingOptions(@$previousTransfer->inputs, $this->inputs, $countInputs, false);
+			$outputPackingOptions=$this->getPackingOptions(@$previousTransfer->outputs, $this->outputs, $countOutputs, false);
 			
 			if ($inputPackingOptions['_0P'] && $outputPackingOptions['_0P'])
 				$packing|=self::COINSPARK_PACKING_INDICES_0P_0P;
@@ -1360,8 +1371,8 @@
 				if (!isset($packingExtend))
 					return 0;
 					
-				$inputPackingType=$this->decodePackingExtend(($packingExtend >> self::COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & self::COINSPARK_PACKING_EXTEND_MASK);
-				$outputPackingType=$this->decodePackingExtend(($packingExtend >> self::COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & self::COINSPARK_PACKING_EXTEND_MASK);
+				$inputPackingType=$this->decodePackingExtend(($packingExtend >> self::COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & self::COINSPARK_PACKING_EXTEND_MASK, false);
+				$outputPackingType=$this->decodePackingExtend(($packingExtend >> self::COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & self::COINSPARK_PACKING_EXTEND_MASK, false);
 
 				if ( (!isset($inputPackingType)) || (!isset($outputPackingType)) )
 					return 0;
@@ -1419,15 +1430,15 @@
 			$txIDPrefixBytes=$counts['txIDPrefixBytes'];
 			
 			$read_array=array(
-				$this->readUnsignedField($metadata, $counts['blockNumBytes'], $this->assetRef->blockNum),
-				$this->readUnsignedField($metadata, $counts['txOffsetBytes'], $this->assetRef->txOffset),
+				$this->shiftReadUnsignedField($metadata, $counts['blockNumBytes'], $this->assetRef->blockNum),
+				$this->shiftReadUnsignedField($metadata, $counts['txOffsetBytes'], $this->assetRef->txOffset),
 				($txIDPrefixBytes==0) ? true : 
 					(strlen($this->assetRef->txIDPrefix=strtoupper(bin2hex($this->stringShift($metadata, $txIDPrefixBytes))))==(2*$txIDPrefixBytes)),
-				$this->readUnsignedField($metadata, $counts['firstInputBytes'], $this->inputs->first),
-				$this->readUnsignedField($metadata, $counts['countInputsBytes'], $this->inputs->count),
-				$this->readUnsignedField($metadata, $counts['firstOutputBytes'], $this->outputs->first),
-				$this->readUnsignedField($metadata, $counts['countOutputsBytes'], $this->outputs->count),
-				$this->readUnsignedField($metadata, $counts['quantityBytes'], $decodeQuantity),
+				$this->shiftReadUnsignedField($metadata, $counts['firstInputBytes'], $this->inputs->first),
+				$this->shiftReadUnsignedField($metadata, $counts['countInputsBytes'], $this->inputs->count),
+				$this->shiftReadUnsignedField($metadata, $counts['firstOutputBytes'], $this->outputs->first),
+				$this->shiftReadUnsignedField($metadata, $counts['countOutputsBytes'], $this->outputs->count),
+				$this->shiftReadUnsignedField($metadata, $counts['quantityBytes'], $decodeQuantity),
 			);
 
 			foreach ($read_array as $read)
@@ -1524,74 +1535,6 @@
 			return $buffer;
 		}
 		
-		private function getPackingOptions($previousRange, $range, $countInputsOutputs)
-		{
-			$packingOptions=array();
-			
-			$firstZero=($range->first==0);
-			$firstByte=($range->first<=COINSPARK_UNSIGNED_BYTE_MAX);
-			$first2Bytes=($range->first<=COINSPARK_UNSIGNED_2_BYTES_MAX);
-			$countOne=($range->count==1);
-			$countByte=($range->count<=COINSPARK_UNSIGNED_BYTE_MAX);
-			
-			if (isset($previousRange)) {
-				$packingOptions['_0P']=($range->first==$previousRange->first) && ($range->count==$previousRange->count);
-				$packingOptions['_1S']=($range->first==($previousRange->first+$previousRange->count)) && $countOne;
-				
-			} else {
-				$packingOptions['_0P']=$firstZero && $countOne;
-				$packingOptions['_1S']=($range->first==1) && $countOne;
-			}
-			
-			$packingOptions['_BYTE']=$firstByte && $countOne;
-			$packingOptions['_2_BYTES']=$first2Bytes && $countOne;
-			$packingOptions['_1_1_BYTES']=$firstByte && $countByte;
-			$packingOptions['_2_1_BYTES']=$first2Bytes && $countByte;
-			$packingOptions['_2_2_BYTES']=$first2Bytes && ($range->count<=COINSPARK_UNSIGNED_2_BYTES_MAX);
-			$packingOptions['_ALL']=$firstZero && ($range->count>=$countInputsOutputs);
-			
-			return $packingOptions;
-		}
-		
-		private function packingTypeToValues($packingType, $previousRange, $countInputOutputs)
-		{
-			$range=new CoinSparkIORange();
-			
-			switch ($packingType)
-			{
-				case '_0P':
-					if (isset($previousRange)) {
-						$range->first=$previousRange->first;
-						$range->count=$previousRange->count;
-					} else {
-						$range->first=0;
-						$range->count=1;
-					}
-					break;
-			
-				case '_1S':
-					if (isset($previousRange))
-						$range->first=$previousRange->first+$previousRange->count;
-					else
-						$range->first=1;
-			
-					$range->count=1;
-					break;
-			
-				case '_BYTE':
-				case '_2_BYTES':
-					$range->count=1;
-					break;
-			
-				case '_ALL':
-					$range->first=0;
-					$range->count=$countInputOutputs;
-					break;
-			}
-			
-			return $range;
-		}
-
 		private function packingToByteCounts($packing, $packingExtend)
 		{
 		
@@ -1636,63 +1579,10 @@
 		//  Packing for input and output indices (relevant for extended indices only)
 	
 			if (($packing & self::COINSPARK_PACKING_INDICES_MASK) == self::COINSPARK_PACKING_INDICES_EXTEND) {
-	
-			//  Input indices
-		
-				switch (($packingExtend >> self::COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & self::COINSPARK_PACKING_EXTEND_MASK)
-				{
-					case self::COINSPARK_PACKING_EXTEND_BYTE:
-						$counts['firstInputBytes']=1;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_2_BYTES:
-						$counts['firstInputBytes']=2;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_1_1_BYTES:
-						$counts['firstInputBytes']=1;
-						$counts['countInputsBytes']=1;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_2_1_BYTES:
-						$counts['firstInputBytes']=2;
-						$counts['countInputsBytes']=1;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_2_2_BYTES:
-						$counts['firstInputBytes']=2;
-						$counts['countInputsBytes']=2;
-						break;
-				}
-		
-			//  Output indices
-		
-				switch (($packingExtend >> self::COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & self::COINSPARK_PACKING_EXTEND_MASK)
-				{
-					case self::COINSPARK_PACKING_EXTEND_BYTE:
-						$counts['firstOutputBytes']=1;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_2_BYTES:
-						$counts['firstOutputBytes']=2;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_1_1_BYTES:
-						$counts['firstOutputBytes']=1;
-						$counts['countOutputsBytes']=1;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_2_1_BYTES:
-						$counts['firstOutputBytes']=2;
-						$counts['countOutputsBytes']=1;
-						break;
-				
-					case self::COINSPARK_PACKING_EXTEND_2_2_BYTES:
-						$counts['firstOutputBytes']=2;
-						$counts['countOutputsBytes']=2;
-						break;
-				}
-		
+				$this->packingExtendAddByteCounts(($packingExtend >> self::COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) &
+					self::COINSPARK_PACKING_EXTEND_MASK, $counts['firstInputBytes'], $counts['countInputsBytes']);
+				$this->packingExtendAddByteCounts(($packingExtend >> self::COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) &
+					self::COINSPARK_PACKING_EXTEND_MASK, $counts['firstOutputBytes'], $counts['countOutputsBytes']);
 			}
 	
 		//  Packing for quantity
@@ -1729,60 +1619,6 @@
 			return $counts;
 		}
 		
-		private function getPackingExtendMap()
-		{
-			 return array(
-				'_0P' => self::COINSPARK_PACKING_EXTEND_0P,
-				'_1S' => self::COINSPARK_PACKING_EXTEND_1S,
-				'_ALL' => self::COINSPARK_PACKING_EXTEND_ALL,
-				'_BYTE' => self::COINSPARK_PACKING_EXTEND_BYTE,
-				'_2_BYTES' => self::COINSPARK_PACKING_EXTEND_2_BYTES,
-				'_1_1_BYTES' => self::COINSPARK_PACKING_EXTEND_1_1_BYTES,
-				'_2_1_BYTES' => self::COINSPARK_PACKING_EXTEND_2_1_BYTES,
-				'_2_2_BYTES' => self::COINSPARK_PACKING_EXTEND_2_2_BYTES,
-			); // in order of preference
-		}
-		
-		private function encodePackingExtend($packingOptions)
-		{
-			$packingExtendMap=$this->getPackingExtendMap();
-			
-			foreach ($packingExtendMap as $packingType => $packingExtend)
-				if ($packingOptions[$packingType])
-					return $packingExtend;
-					
-			return null;
-		}
-		
-		private function decodePackingExtend($packingExtend)
-		{
-			$packingExtendMap=$this->getPackingExtendMap();
-			
-			foreach ($packingExtendMap as $packingType => $testPackingExtend)
-				if ($packingExtend==$testPackingExtend)
-					return $packingType;
-					
-			return null;
-		}
-
-		private function writeUnsignedField($bytes, $source)
-		{
-			return ($bytes>0) ? $this->writeSmallEndianUnsigned($source, $bytes) : ''; // will return null on failure
-		}
-		
-		private function readUnsignedField(&$metadata, $bytes, &$destination)
-		{
-			if ($bytes>0) {
-				$value=$this->shiftReadSmallEndianUnsigned($metadata, $bytes);
-
-				if (isset($value))
-					$destination=$value;
-				else
-					return false;
-			}
-			
-			return true;
-		}
 	}
 	
 	
@@ -2188,6 +2024,383 @@
 	}
 	
 	
+//	CoinSparkMessage class for managing message metadata
+
+	class CoinSparkMessage extends CoinSparkBase {
+		public $useHttps; // boolean
+		public $serverHost; // string
+		public $usePrefix; // boolean
+		public $serverPath; // string
+		public $isPublic; // boolean
+		public $outputRanges; // array of CoinSparkIORange objects
+		public $hash; // raw binary string
+		public $hashLen; // number of bytes in hash that are valid for comparison
+
+		const COINSPARK_OUTPUTS_MORE_FLAG=0x80;
+		const COINSPARK_OUTPUTS_RESERVED_MASK=0x60;
+		const COINSPARK_OUTPUTS_TYPE_MASK=0x18;
+		const COINSPARK_OUTPUTS_TYPE_SINGLE=0x00; // one output index (0...7)
+		const COINSPARK_OUTPUTS_TYPE_FIRST=0x08; // first (0...7) outputs
+		const COINSPARK_OUTPUTS_TYPE_UNUSED=0x10; // for future use
+		const COINSPARK_OUTPUTS_TYPE_EXTEND=0x18; // "extend", including public/all
+		const COINSPARK_OUTPUTS_VALUE_MASK=0x07;
+		const COINSPARK_OUTPUTS_VALUE_MAX=7;
+
+		function __construct()
+		{
+			$this->clear();
+		}
+		
+		function clear()
+		{
+			$this->useHttps=false;
+			$this->serverHost='';
+			$this->usePrefix=false;
+			$this->serverPath='';
+			$this->isPublic=false;
+			$this->outputRanges=array();
+			$this->hash='';
+			$this->hashLen=0;
+		}
+		
+		function toString()
+		{
+			$hostPathMetadata=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix);
+			$urlString=$this->calcServerURL();
+			
+			$buffer="COINSPARK MESSAGE\n";
+			$buffer.=sprintf("    Server URL: %s (length %d+%d encoded %s length %d)\n", $urlString,
+				strlen($this->serverHost), strlen($this->serverPath), strtoupper(bin2hex($hostPathMetadata)), strlen($hostPathMetadata));
+			$buffer.=sprintf("Public message: %s\n", $this->isPublic ? "yes" : "no");
+			
+			foreach ($this->outputRanges as $outputRange) {
+				if ($outputRange->count>0) {
+					if ($outputRange->count>1)
+						$buffer.=sprintf("       Outputs: %d - %d (count %d)", $outputRange->first,
+							$outputRange->first+$outputRange->count-1, $outputRange->count);
+					else
+						$buffer.=sprintf("        Output: %d", $outputRange->first);
+				} else
+					$buffer.=sprintf("       Outputs: none");
+		
+				$buffer.=sprintf(" (small endian hex: first %s count %s)\n", $this->unsignedToSmallEndianHex($outputRange->first, 2),
+					$this->unsignedToSmallEndianHex($outputRange->count, 2));
+			}
+			
+			$buffer.=sprintf("  Message hash: %s (length %d)\n", strtoupper(bin2hex(substr($this->hash, 0, $this->hashLen))), $this->hashLen);
+			$buffer.="END COINSPARK MESSAGE\n\n";
+			
+			return $buffer;
+		}
+		
+		function isValid()
+		{
+			if (!(
+				$this->isBoolean($this->useHttps) &&
+				$this->isString($this->serverHost) &&
+				$this->isBoolean($this->usePrefix) &&
+				$this->isString($this->serverPath) &&
+				$this->isBoolean($this->isPublic) &&
+				is_array($this->outputRanges) &&
+				$this->isString($this->hash) &&
+				$this->isInteger($this->hashLen)
+			))
+				return false;
+			
+			if (strlen($this->serverHost)>COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN)
+				return false;
+	
+			if (strlen($this->serverPath)>COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN)
+				return false;
+				
+			if (strlen($this->hash)<$this->hashLen) // check we have at least as much data as specified by $this->hashLen
+				return false; 
+	
+			if ( ($this->hashLen<COINSPARK_MESSAGE_HASH_MIN_LEN) || ($this->hashLen>COINSPARK_MESSAGE_HASH_MAX_LEN) )
+				return false;
+
+			if ( (!$this->isPublic) && (count($this->outputRanges)==0) ) // public or aimed at some outputs at least
+				return false;
+	
+			if (count($this->outputRanges)>COINSPARK_MESSAGE_MAX_IO_RANGES)
+				return false;
+	
+			foreach ($this->outputRanges as $outputRange)
+				if (!$outputRange->isValid())
+					return false;
+	
+			return true;
+		}
+		
+		function match($otherMessage, $strict)
+		{
+			$hashCompareLen=min($this->hashLen, $otherMessage->hashLen, COINSPARK_MESSAGE_HASH_MAX_LEN);
+	
+			if ($strict) {
+				$thisRanges=$this->outputRanges;
+				$otherRanges=$otherMessage->outputRanges;
+		
+			} else {
+				$thisRanges=$this->normalizeIORanges($this->outputRanges);
+				$otherRanges=$this->normalizeIORanges($otherMessage->outputRanges);
+			}
+			
+			if (count($thisRanges) != count($otherRanges))
+				return false;
+				
+			foreach ($thisRanges as $index => $thisRange)
+				if (!$thisRange->match($otherRanges[$index]))
+					return false;
+			
+			return ($this->useHttps==$otherMessage->useHttps) &&
+				(!strcasecmp($this->serverHost, $otherMessage->serverHost)) &&
+				($this->usePrefix==$otherMessage->usePrefix) &&
+				(!strcasecmp($this->serverPath, $otherMessage->serverPath)) &&
+				($this->isPublic==$otherMessage->isPublic) &&
+				(!strncasecmp($this->hash, $otherMessage->hash, $hashCompareLen));
+		}
+		
+		function encode($countOutputs, $metadataMaxLen)
+		{
+			if (!$this->isValid())
+				return null;
+
+		//  4-character identifier
+		
+			$metadata=COINSPARK_METADATA_IDENTIFIER.COINSPARK_MESSAGE_PREFIX;
+	
+		//  Server host and path
+			
+			$written=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix);
+			if (!isset($written))
+				return null;
+	
+			$metadata.=$written;
+	
+		//  Output ranges
+	
+			if ($this->isPublic) { // add public indicator first
+				$packing=((count($this->outputRanges)>0) ? self::COINSPARK_OUTPUTS_MORE_FLAG : 0)|
+					self::COINSPARK_OUTPUTS_TYPE_EXTEND | self::COINSPARK_PACKING_EXTEND_PUBLIC;
+				$metadata.=chr($packing);
+			}
+			
+			foreach ($this->outputRanges as $index => $outputRange) { // other output ranges
+				$packing=$this->getOutputRangePacking($outputRange, $countOutputs, $firstBytes, $countBytes);
+				if (!isset($packing))
+					return null;
+		
+			//  The packing byte
+		
+				if (($index+1)<count($this->outputRanges))
+					$packing|=self::COINSPARK_OUTPUTS_MORE_FLAG;
+
+				$metadata.=chr($packing);
+		
+			//  The index of the first output, if necessary
+		
+				$written=$this->writeUnsignedField($firstBytes, $outputRange->first);
+				if (!isset($written))
+					return null;
+				
+				$metadata.=$written;
+		
+			//  The number of outputs, if necessary
+				
+				$written=$this->writeUnsignedField($countBytes, $outputRange->count);
+				if (!isset($written))
+					return null;
+				
+				$metadata.=$written;
+			}
+
+		//  Message hash
+		
+			$metadata.=substr($this->hash, 0, $this->hashLen);
+
+		//	Check the total length is within the specified limit
+		
+			if (strlen($metadata)>$metadataMaxLen)
+				return null;
+				
+		//	Return what we created
+		
+			return $metadata;
+		}
+		
+		function decode($metadata, $countOutputs)
+		{
+			$metadata=CoinSparkLocateMetadataRange($metadata, COINSPARK_MESSAGE_PREFIX);
+			if (!isset($metadata))
+				return false;
+				
+		//  Server host and path
+			
+			$decodedHostPath=$this->shiftDecodeDomainAndOrPath($metadata, true, true);
+			if (!isset($decodedHostPath))
+				return false;
+				
+			$this->useHttps=$decodedHostPath['useHttps'];
+			$this->serverHost=$decodedHostPath['domainName'];
+			$this->usePrefix=$decodedHostPath['usePrefix'];
+			$this->serverPath=$decodedHostPath['pagePath'];
+	
+		//  Output ranges
+	
+			$this->isPublic=false;
+			$this->outputRanges=array();
+	
+			do {
+		
+			//  Read the next packing byte and check reserved bits are zero
+		
+				$packing=$this->shiftReadSmallEndianUnsigned($metadata, 1);
+				if (!isset($packing))
+					return false;
+	 
+				if ($packing & self::COINSPARK_OUTPUTS_RESERVED_MASK)
+					return false;
+		
+				$packingType=$packing & self::COINSPARK_OUTPUTS_TYPE_MASK;
+				$packingValue=$packing & self::COINSPARK_OUTPUTS_VALUE_MASK;
+		
+				if (($packingType==self::COINSPARK_OUTPUTS_TYPE_EXTEND) && ($packingValue==self::COINSPARK_PACKING_EXTEND_PUBLIC))
+					$this->isPublic=true; // special case for public messages
+		
+				else {
+		
+				//  Create a new output range
+			
+					if (count($this->outputRanges)>=COINSPARK_MESSAGE_MAX_IO_RANGES) // too many output ranges
+						return false;
+					
+					$firstBytes=0;
+					$countBytes=0;
+			
+				//  Decode packing byte
+			
+					if ($packingType==self::COINSPARK_OUTPUTS_TYPE_SINGLE) { // inline single input
+						$outputRange=new CoinSparkIORange();
+						$outputRange->first=$packingValue;
+						$outputRange->count=1;
+		   
+					} else if ($packingType==self::COINSPARK_OUTPUTS_TYPE_FIRST) { // inline first few outputs
+						$outputRange=new CoinSparkIORange();
+						$outputRange->first=0;
+						$outputRange->count=$packingValue;
+				
+					} else if ($packingType==self::COINSPARK_OUTPUTS_TYPE_EXTEND) { // we'll be taking additional bytes
+						$extendPackingType=$this->decodePackingExtend($packingValue, true);
+						if (!isset($extendPackingType))
+							return false;
+						
+						$outputRange=$this->packingTypeToValues($extendPackingType, null, $countOutputs);
+						$this->packingExtendAddByteCounts($packingValue, $firstBytes, $countBytes);
+				
+					} else
+						return false; // will be self::COINSPARK_OUTPUTS_TYPE_UNUSED
+			
+				//  The index of the first output and number of outputs, if necessary
+					
+					if (!$this->shiftReadUnsignedField($metadata, $firstBytes, $outputRange->first))
+						return false;
+						
+					if (!$this->shiftReadUnsignedField($metadata, $countBytes, $outputRange->count))
+						return false;
+					
+				//	Add on the new output range
+				
+					$this->outputRanges[]=$outputRange;
+				}
+		
+			} while
+				($packing & self::COINSPARK_OUTPUTS_MORE_FLAG);
+	
+		//  Message hash
+		
+			$this->hashLen=min(strlen($metadata), COINSPARK_MESSAGE_HASH_MAX_LEN);
+			$this->hash=$this->stringShift($metadata, $this->hashLen); // insufficient length will be caught by isValid()
+
+		//  Return validity
+	
+			return $this->isValid();
+		}
+		
+		function hasOutput($outputIndex)
+		{
+			foreach ($this->outputRanges as $outputRange)
+				if ( ($outputIndex>=$outputRange->first) && ($outputIndex<($outputRange->first+$outputRange->count)) )
+					return true;
+
+			return false;
+		}
+		
+		function calcHashLen($countOutputs, $metadataMaxLen)
+		{
+			$hashLen=$metadataMaxLen-COINSPARK_METADATA_IDENTIFIER_LEN-1;
+	
+			$hostPathLen=strlen($this->serverPath)+1;
+	
+			if ($this->readIPv4Address($this->serverHost))
+				$hashLen-=5; // packing and IP octets
+			else {
+				$hashLen-=1; // packing
+				$hostPathLen+=strlen($this->shrinkLowerDomainName($this->serverHost, $packing))+1;
+			}
+	
+			$hashLen-=2*floor(($hostPathLen+2)/3); // uses integer arithmetic
+	
+			if ($this->isPublic)
+				$hashLen--;
+			
+			foreach ($this->outputRanges as $outputRange) {
+				$packing=$this->getOutputRangePacking($outputRange, $countOutputs, $firstBytes, $countBytes);
+				if (isset($packing))
+					$hashLen-=(1+$firstBytes+$countBytes);
+			}
+	
+			return min(max($hashLen, 0), COINSPARK_MESSAGE_HASH_MAX_LEN);
+		}
+		
+		function calcServerURL()
+		{
+			return strtolower(
+				(($this->useHttps) ? 'https' : 'http').
+				'://'.$this->serverHost.'/'.
+				($this->usePrefix ? 'coinspark/' : '').
+				$this->serverPath.
+				(strlen($this->serverPath) ? '/' : '')
+			);
+		}
+		
+		private function getOutputRangePacking($outputRange, $countOutputs, &$firstBytes, &$countBytes)
+		{
+			$packingOptions=$this->getPackingOptions(null, $outputRange, $countOutputs, true);
+	
+			$firstBytes=0;
+			$countBytes=0;
+	
+			if ($packingOptions['_1_0_BYTE'] && ($outputRange->first<=self::COINSPARK_OUTPUTS_VALUE_MAX)) // inline single output
+				$packing=self::COINSPARK_OUTPUTS_TYPE_SINGLE | ($outputRange->first & self::COINSPARK_OUTPUTS_VALUE_MASK);
+	
+			elseif ($packingOptions['_0_1_BYTE'] && ($outputRange->count<=self::COINSPARK_OUTPUTS_VALUE_MAX)) // inline first few outputs
+				$packing=self::COINSPARK_OUTPUTS_TYPE_FIRST | ($outputRange->count & self::COINSPARK_OUTPUTS_VALUE_MASK);
+	
+			else { // we'll be taking additional bytes
+				$packingExtend=$this->encodePackingExtend($packingOptions);
+				if (!isset($packingExtend))
+					return null;
+		
+				$this->packingExtendAddByteCounts($packingExtend, $firstBytes, $countBytes);
+		
+				$packing=self::COINSPARK_OUTPUTS_TYPE_EXTEND | ($packingExtend & self::COINSPARK_OUTPUTS_VALUE_MASK);
+			}
+	
+			return $packing;
+		}		
+	}
+
+
 //	Class used internally for input or output ranges	
 
 	class CoinSparkIORange extends CoinSparkBase {
@@ -2227,6 +2440,18 @@
 
 	class CoinSparkBase {
 	
+		const COINSPARK_PACKING_EXTEND_MASK=0x07;
+		const COINSPARK_PACKING_EXTEND_0P=0x00; // index 0 only or previous (transfers only)
+		const COINSPARK_PACKING_EXTEND_PUBLIC=0x00; // this is public (messages only)
+		const COINSPARK_PACKING_EXTEND_1S=0x01; // index 1 or subsequent to previous (transfers only)
+		const COINSPARK_PACKING_EXTEND_0_1_BYTE=0x01; // starting at 0, 1 byte for count (messages only)
+		const COINSPARK_PACKING_EXTEND_1_0_BYTE=0x02; // 1 byte for single index, count is 1
+		const COINSPARK_PACKING_EXTEND_2_0_BYTES=0x03; // 2 bytes for single index, count is 1
+		const COINSPARK_PACKING_EXTEND_1_1_BYTES=0x04; // 1 byte for first index, 1 byte for count
+		const COINSPARK_PACKING_EXTEND_2_1_BYTES=0x05; // 2 bytes for first index, 1 byte for count
+		const COINSPARK_PACKING_EXTEND_2_2_BYTES=0x06; // 2 bytes for first index, 2 bytes for count
+		const COINSPARK_PACKING_EXTEND_ALL=0x07; // all inputs|outputs
+
 		protected function isInteger($value)
 		{
 			return is_numeric($value) && (intval($value)==$value); // allows numerical strings
@@ -2655,6 +2880,212 @@
 		//  Finish and return
 	
 			return $result;
+		}
+		
+		protected function normalizeIORanges($inRanges)
+		{
+			$countRanges=count($inRanges);
+			if ($countRanges==0)
+				return $inRanges;
+				
+			$rangeUsed=array_fill(0, $countRanges, false);
+			$outRanges=array();
+			$countRemoved=0;
+	
+			for ($orderIndex=0; $orderIndex<$countRanges; $orderIndex++) {
+				$lowestRangeFirst=0;
+				$lowestRangeIndex=-1;
+		
+				for ($rangeIndex=0; $rangeIndex<$countRanges; $rangeIndex++)
+					if (!$rangeUsed[$rangeIndex])
+						if ( ($lowestRangeIndex==-1) || ($inRanges[$rangeIndex]->first<$lowestRangeFirst) ) {
+							$lowestRangeFirst=$inRanges[$rangeIndex]->first;
+							$lowestRangeIndex=$rangeIndex;
+						}
+		
+				if (($orderIndex>0) && ($inRanges[$lowestRangeIndex]->first<=$lastRangeEnd)) { // we can combine two adjacent ranges
+					$countRemoved++;
+					$thisRangeEnd=$inRanges[$lowestRangeIndex]->first+$inRanges[$lowestRangeIndex]->count;
+					$outRanges[$orderIndex-$countRemoved]->count=max($lastRangeEnd, $thisRangeEnd)-$outRanges[$orderIndex-$countRemoved]->first;
+		
+				} else
+					$outRanges[$orderIndex-$countRemoved]=clone $inRanges[$lowestRangeIndex];
+			
+				$lastRangeEnd=$outRanges[$orderIndex-$countRemoved]->first+$outRanges[$orderIndex-$countRemoved]->count;
+				$rangeUsed[$lowestRangeIndex]=true;
+			}
+	
+			return $outRanges;
+		}
+		
+		protected function getPackingOptions($previousRange, $range, $countInputsOutputs, $forMessages)
+		{
+			$packingOptions=array();
+			
+			$firstZero=($range->first==0);
+			$firstByte=($range->first<=COINSPARK_UNSIGNED_BYTE_MAX);
+			$first2Bytes=($range->first<=COINSPARK_UNSIGNED_2_BYTES_MAX);
+			$countOne=($range->count==1);
+			$countByte=($range->count<=COINSPARK_UNSIGNED_BYTE_MAX);
+			
+			if ($forMessages) {
+				$packingOptions['_0P']=false;
+				$packingOptions['_1S']=false; // these two options not used for messages
+				$packingOptions['_0_1_BYTE']=$firstZero && $countByte;
+				
+			} else {
+				if (isset($previousRange)) {
+					$packingOptions['_0P']=($range->first==$previousRange->first) && ($range->count==$previousRange->count);
+					$packingOptions['_1S']=($range->first==($previousRange->first+$previousRange->count)) && $countOne;
+				
+				} else {
+					$packingOptions['_0P']=$firstZero && $countOne;
+					$packingOptions['_1S']=($range->first==1) && $countOne;
+				}
+				
+				$packingOptions['_0_1_BYTE']=false; // this option not used for transfers
+			}
+			
+			$packingOptions['_1_0_BYTE']=$firstByte && $countOne;
+			$packingOptions['_2_0_BYTES']=$first2Bytes && $countOne;
+			$packingOptions['_1_1_BYTES']=$firstByte && $countByte;
+			$packingOptions['_2_1_BYTES']=$first2Bytes && $countByte;
+			$packingOptions['_2_2_BYTES']=$first2Bytes && ($range->count<=COINSPARK_UNSIGNED_2_BYTES_MAX);
+			$packingOptions['_ALL']=$firstZero && ($range->count>=$countInputsOutputs);
+			
+			return $packingOptions;
+		}
+		
+		protected function packingTypeToValues($packingType, $previousRange, $countInputOutputs)
+		{
+			$range=new CoinSparkIORange();
+			
+			switch ($packingType)
+			{
+				case '_0P':
+					if (isset($previousRange)) {
+						$range->first=$previousRange->first;
+						$range->count=$previousRange->count;
+					} else {
+						$range->first=0;
+						$range->count=1;
+					}
+					break;
+			
+				case '_1S':
+					if (isset($previousRange))
+						$range->first=$previousRange->first+$previousRange->count;
+					else
+						$range->first=1;
+			
+					$range->count=1;
+					break;
+					
+				case '_0_1_BYTE':
+					$range->first=0;
+					break;
+			
+				case '_1_0_BYTE':
+				case '_2_0_BYTES':
+					$range->count=1;
+					break;
+			
+				case '_ALL':
+					$range->first=0;
+					$range->count=$countInputOutputs;
+					break;
+			}
+			
+			return $range;
+		}
+		
+		protected function packingExtendAddByteCounts($packingExtend, &$firstBytes, &$countBytes)
+		{
+			switch ($packingExtend) {
+				case self::COINSPARK_PACKING_EXTEND_0_1_BYTE:
+					$countBytes=1;
+					break;
+				
+				case self::COINSPARK_PACKING_EXTEND_1_0_BYTE:
+					$firstBytes=1;
+					break;
+		
+				case self::COINSPARK_PACKING_EXTEND_2_0_BYTES:
+					$firstBytes=2;
+					break;
+		
+				case self::COINSPARK_PACKING_EXTEND_1_1_BYTES:
+					$firstBytes=1;
+					$countBytes=1;
+					break;
+		
+				case self::COINSPARK_PACKING_EXTEND_2_1_BYTES:
+					$firstBytes=2;
+					$countBytes=1;
+					break;
+		
+				case self::COINSPARK_PACKING_EXTEND_2_2_BYTES:
+					$firstBytes=2;
+					$countBytes=2;
+					break;
+			}
+		}
+
+		protected function getPackingExtendMap()
+		{
+			 return array(
+				'_0P' => self::COINSPARK_PACKING_EXTEND_0P,
+				'_1S' => self::COINSPARK_PACKING_EXTEND_1S,
+				'_ALL' => self::COINSPARK_PACKING_EXTEND_ALL,
+				'_1_0_BYTE' => self::COINSPARK_PACKING_EXTEND_1_0_BYTE,
+				'_0_1_BYTE' => self::COINSPARK_PACKING_EXTEND_0_1_BYTE,
+				'_2_0_BYTES' => self::COINSPARK_PACKING_EXTEND_2_0_BYTES,
+				'_1_1_BYTES' => self::COINSPARK_PACKING_EXTEND_1_1_BYTES,
+				'_2_1_BYTES' => self::COINSPARK_PACKING_EXTEND_2_1_BYTES,
+				'_2_2_BYTES' => self::COINSPARK_PACKING_EXTEND_2_2_BYTES,
+			); // in order of preference
+		}
+		
+		protected function encodePackingExtend($packingOptions)
+		{
+			$packingExtendMap=$this->getPackingExtendMap();
+			
+			foreach ($packingExtendMap as $packingType => $packingExtend)
+				if ($packingOptions[$packingType])
+					return $packingExtend;
+					
+			return null;
+		}
+		
+		protected function decodePackingExtend($packingExtend, $forMessages)
+		{
+			$packingExtendMap=$this->getPackingExtendMap();
+			
+			foreach ($packingExtendMap as $packingType => $testPackingExtend)
+				if ($packingExtend==$testPackingExtend)
+					if ($packingType!=($forMessages ? '_1S' : '_0_1_BYTE')) // no _1S for messages, no _0_1_BYTE for transfers
+						return $packingType;
+					
+			return null;
+		}
+
+		protected function writeUnsignedField($bytes, $source)
+		{
+			return ($bytes>0) ? $this->writeSmallEndianUnsigned($source, $bytes) : ''; // will return null on failure
+		}
+		
+		protected function shiftReadUnsignedField(&$metadata, $bytes, &$destination)
+		{
+			if ($bytes>0) {
+				$value=$this->shiftReadSmallEndianUnsigned($metadata, $bytes);
+
+				if (isset($value))
+					$destination=$value;
+				else
+					return false;
+			}
+			
+			return true;
 		}
 	}
 	

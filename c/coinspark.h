@@ -1,7 +1,7 @@
 /*
- * CoinSpark 1.0 - C library
+ * CoinSpark 2.0 - C library
  *
- * Copyright (c) 2014 Coin Sciences Ltd
+ * Copyright (c) Coin Sciences Ltd
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -68,11 +68,19 @@ extern "C" {
 #define COINSPARK_ASSETREF_TXID_PREFIX_LEN 2
 
 #define COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE -1 // magic number for a default route
+    
+#define COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN 32
+#define COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN 24
+#define COINSPARK_MESSAGE_HASH_MIN_LEN 12
+#define COINSPARK_MESSAGE_HASH_MAX_LEN 32
+#define COINSPARK_MESSAGE_MAX_IO_RANGES 16
 
 #define COINSPARK_IO_INDEX_MAX 65535
 
 #define COINSPARK_ADDRESS_FLAG_ASSETS 1
 #define COINSPARK_ADDRESS_FLAG_PAYMENT_REFS 2
+#define COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES 4
+#define COINSPARK_ADDRESS_FLAG_FILE_MESSAGES 8
 #define COINSPARK_ADDRESS_FLAG_MASK 0x7FFFFF // 23 bits are currently usable
 
 // CoinSpark type definitions
@@ -104,7 +112,7 @@ typedef struct {
     bool usePrefix; // prefix coinspark/ in asset web page URL path
     char pagePath[COINSPARK_GENESIS_PAGE_PATH_MAX_LEN+1]; // null terminated
     int8_t assetHash[COINSPARK_GENESIS_HASH_MAX_LEN];
-    size_t assetHashLen; // number of bytes in assetHash that are valid for comparison
+    size_t assetHashLen; // number of bytes in assetHash that are valid for comparison/encoding
 } CoinSparkGenesis;
 
 typedef struct {
@@ -123,6 +131,18 @@ typedef struct {
     CoinSparkIORange outputs;
     CoinSparkAssetQty qtyPerOutput;
 } CoinSparkTransfer;
+    
+typedef struct {
+    bool useHttps;
+    char serverHost[COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN+1]; // null terminated
+    bool usePrefix; // prefix coinspark/ in server path
+    char serverPath[COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN+1]; // null terminated
+    bool isPublic; // is the message publicly viewable
+    int countOutputRanges; // number of elements in output range array
+    CoinSparkIORange outputRanges[COINSPARK_MESSAGE_MAX_IO_RANGES]; // array of output ranges
+    int8_t hash[COINSPARK_MESSAGE_HASH_MAX_LEN];
+    size_t hashLen; // number of bytes in hash that are valid for comparison/encoding
+} CoinSparkMessage;
     
     
 // General functions for managing CoinSpark metadata and bitcoin transaction output scripts
@@ -234,7 +254,7 @@ CoinSparkAssetQty CoinSparkGenesisCalcGross(const CoinSparkGenesis *genesis, Coi
     // Calculates the quantity that should be sent so that, after the payment charge specified by genesis
     // is applied, the recipient will receive qtyNet units.
     
-size_t CoinSparkGenesisCalcHashLen(CoinSparkGenesis *genesis, const size_t metadataMaxLen);
+size_t CoinSparkGenesisCalcHashLen(const CoinSparkGenesis *genesis, const size_t metadataMaxLen);
     // Calculates the appropriate asset hash length of genesis so that when encoded as metadata the genesis will
     // fit in metadataMaxLen bytes. For now, set metadataMaxLen to 40 (see Bitcoin's MAX_OP_RETURN_RELAY parameter).
 
@@ -393,13 +413,51 @@ bool CoinSparkPaymentRefDecode(CoinSparkPaymentRef* paymentRef, const char* meta
     // Return true if the decode was successful, false otherwise.
     
     
-// Functions for calculating asset web page URLs and hashes
+// Functions for managing messages
+
+void CoinSparkMessageClear(CoinSparkMessage* message);
+    // Set all fields in message to their default/zero values, which are not necessarily valid.
+    
+bool CoinSparkMessageToString(const CoinSparkMessage* message, char* string, const size_t stringMaxLen);
+    // Outputs the message to a null-delimited string (size stringMaxLen) for debugging.
+    // Returns true if there was enough space (4096 bytes recommended) or false otherwise.
+
+bool CoinSparkMessageIsValid(const CoinSparkMessage* message);
+    // Returns true if message is valid, false otherwise.
+
+bool CoinSparkMessageMatch(const CoinSparkMessage* message1, const CoinSparkMessage* message2, const bool strict);
+    // Returns true if the two CoinSparkMessage structures are the same. If strict is true then the outputRange
+    // fields must be identical. If strict is false then they must only represent the same set of outputs.
+
+size_t CoinSparkMessageEncode(const CoinSparkMessage* message, const int countOutputs, char* metadata, const size_t metadataMaxLen);
+    // Encodes the message into metadata (whose size is metadataMaxLen)
+    // Pass the number of transaction outputs in countOutputs respectively.
+    // If the encoding was successful, returns the number of bytes used, otherwise 0.
+
+bool CoinSparkMessageDecode(CoinSparkMessage* message, const int countOutputs, const char* metadata, const size_t metadataLen);
+    // Decodes the message in metadata (length metadataLen) into the message variable.
+    // Pass the number of transaction outputs in countOutputs respectively.
+    // Returns true if the decode was successful, false otherwise.
+    
+bool CoinSparkMessageHasOutput(const CoinSparkMessage* message, int outputIndex);
+    // Returns true if the message is intended for the given outputIndex.
+
+size_t CoinSparkMessageCalcHashLen(const CoinSparkMessage *message, int countOutputs, const size_t metadataMaxLen);
+    // Calculates the appropriate hash length for message so that when encoded as metadata the message will
+    // fit in metadataMaxLen bytes. For now, set metadataMaxLen to 40 (see Bitcoin's MAX_OP_RETURN_RELAY parameter).
+
+    
+// Functions for calculating URLs and hashes
     
 size_t CoinSparkGenesisCalcAssetURL(const CoinSparkGenesis *genesis, const char* firstSpentTxID, const int firstSpentVout,
                                     char* urlString, const size_t urlStringMaxLen);
     // Calculates the URL for the asset web page of genesis into urlString (length urlStringMaxLen).
     // In firstSpentTxID, pass the previous txid whose output was spent by the first input of the genesis.
     // In firstSpentVout, pass the output index of firstSpentTxID spent by the first input of the genesis.
+    // Returns the length of the URL, or 0 if urlStringMaxLen (recommended 256 bytes) was not large enough.
+    
+size_t CoinSparkMessageCalcServerURL(const CoinSparkMessage* message, char* urlString, const size_t urlStringMaxLen);
+    // Calculates the URL for the message server into urlString (length urlStringMaxLen).
     // Returns the length of the URL, or 0 if urlStringMaxLen (recommended 256 bytes) was not large enough.
     
 void CoinSparkCalcAssetHash(const char* name, size_t nameLen,
@@ -415,9 +473,24 @@ void CoinSparkCalcAssetHash(const char* name, size_t nameLen,
     // All char* string parameters except contractContent must be passed using UTF-8 encoding.
     // You may pass NULL (and if appropriate, a length of zero) for any parameter which was not in the JSON.
     // Note that you need to pass in the contract *content* and length, not its URL.
+    
+typedef struct {
+    char* mimeType;
+    size_t mimeTypeLen;
+    char* fileName; // can be NULL
+    size_t fileNameLen;
+    unsigned char* content;
+    size_t contentLen;
+} CoinSparkMessagePart;
+
+void CoinSparkCalcMessageHash(const unsigned char* salt, size_t saltLen, const CoinSparkMessagePart* messageParts,
+                              const int countParts, unsigned char messageHash[32]);
+    // Calculates the messageHash for a CoinSpark message containing the given messageParts array (length countParts).
+    // Pass in a random string in salt (length saltLen), that should be sent to the message server along with the content.
 
 void CoinSparkCalcSHA256Hash(const unsigned char* input, const size_t inputLen, unsigned char hash[32]);
     // Calculates the SHA-256 hash of the raw data in input (size inputLen) and places it in the hash variable.
+
     
 // Functions whose purpose is to lock down the legal definitions in CoinSpark contracts
 

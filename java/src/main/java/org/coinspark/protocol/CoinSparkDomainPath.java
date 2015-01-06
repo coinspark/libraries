@@ -1,7 +1,7 @@
 /*
- * CoinSpark 1.0 - Java library
+ * CoinSpark 2.0 - Java library
  *
- * Copyright (c) 2014 Coin Sciences Ltd
+ * Copyright (c) Coin Sciences Ltd
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +33,7 @@ import java.util.Arrays;
  * CoinSpark class for managing Asset web pages structures
  */
 
-public class CoinSparkAssetWebPage extends CoinSparkBase{
+public class CoinSparkDomainPath extends CoinSparkBase{
 
     /**
      * Doiman name (without scheme).
@@ -64,7 +64,7 @@ public class CoinSparkAssetWebPage extends CoinSparkBase{
      * CoinSpark class for managing Asset web pages structures
      */
     
-    protected CoinSparkAssetWebPage()
+    protected CoinSparkDomainPath()
     {
         
     }
@@ -78,14 +78,24 @@ public class CoinSparkAssetWebPage extends CoinSparkBase{
      * @param UsePrefix use "coinspark/" prefix
      */
     
-    protected CoinSparkAssetWebPage(String DomainName,String Path, boolean UseHttps, boolean UsePrefix)
+    public CoinSparkDomainPath(String DomainName,String Path, boolean UseHttps, boolean UsePrefix)
     {
         domainName=DomainName;
         path=Path;
         useHttps=UseHttps;
         usePrefix=UsePrefix;
     }
+
+    /**
+     * Calculates the URL.
+     * 
+     * @return String FUll Domain/path URL 
+     */
     
+    public String getFullURL()
+    {
+        return String.format("%s://%s/%s%s/", useHttps ? "https" : "http",domainName,usePrefix ? "coinspark/" : "",path).toLowerCase();
+    }
     
     /**
      * Returns true if all values in the asset web page are in their permitted ranges, false otherwise.
@@ -108,7 +118,7 @@ public class CoinSparkAssetWebPage extends CoinSparkBase{
      * @return Returns true if the two Asset web page structures are identical.
      */
     
-    protected boolean match(CoinSparkAssetWebPage page2)
+    protected boolean match(CoinSparkDomainPath page2)
     {
         return 
                 domainName.toLowerCase().equals(page2.domainName.toLowerCase()) && 
@@ -169,7 +179,6 @@ public class CoinSparkAssetWebPage extends CoinSparkBase{
         return String.format("%s://%s", useHttps ? "https" : "http",domainName);
     }
         
-    
 // Private variables/constants/functions       
     
     

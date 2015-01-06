@@ -1,5 +1,5 @@
-<!--
- * CoinSpark 2.0 - Javascript test suite HTML wrapper
+/*
+ * CoinSpark 2.0 - Java library
  *
  * Copyright (c) Coin Sciences Ltd
  * 
@@ -20,25 +20,19 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
--->
+ */
 
 
-<html>
-	<head>
-		<script src="coinspark.js"></script>
-		<script src="coinspark-test.js"></script>
-		<title>CoinSpark Javascript Test Page</title>
-		<script>
-			function PerformTest()
-			{
-				document.getElementById('output').value=ProcessInputText(document.getElementById('input').value);
-			}
-		</script>
-	</head>
-	
-	<body>
-		<textarea id="input" style="font-family:monospace; width:48%; height:100%; float:left; padding:4px;" placeholder="Paste contents of input file here"></textarea>
-		<div style="width:4%; float:left; text-align:center;"><input type="button" value="&#8594;" style="font-size:14px;" onclick="PerformTest(); return false;"></div>
-		<textarea id="output" style="font-family:monospace; width:48%; height:100%; float:left; padding:4px;" placeholder="Output goes here"></textarea>
-	</body>
-</html>
+package org.coinspark.protocol;
+
+/**
+ * CoinSparkMessagePart class for managing CoinSpark message parts
+ */
+
+public class CoinSparkMessagePart {
+    
+    public String mimeType;
+    public String fileName;
+    public byte [] content=new byte[0];                
+
+}

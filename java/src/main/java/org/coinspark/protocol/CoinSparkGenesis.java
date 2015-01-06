@@ -1,7 +1,7 @@
 /*
- * CoinSpark 1.0 - Java library
+ * CoinSpark 2.0 - Java library
  *
- * Copyright (c) 2014 Coin Sciences Ltd
+ * Copyright (c) Coin Sciences Ltd
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -304,7 +304,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
         CoinSparkBuffer assetWebPageBuffer=new CoinSparkBuffer();
         String encodedWebPage="";
         
-        CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
+        CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
         if(assetWebPage.encode(assetWebPageBuffer))
         {
             encodedWebPage=assetWebPageBuffer.toHex();
@@ -354,8 +354,8 @@ public class CoinSparkGenesis extends CoinSparkBase{
         int hashCompareLen = Math.min(this.assetHashLen, genesis2.assetHashLen);
         hashCompareLen = Math.min(hashCompareLen, COINSPARK_GENESIS_HASH_MAX_LEN);
 
-        CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
-        CoinSparkAssetWebPage assetWebPage2=new CoinSparkAssetWebPage(genesis2.getDomainName(), 
+        CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
+        CoinSparkDomainPath assetWebPage2=new CoinSparkDomainPath(genesis2.getDomainName(), 
                 genesis2.getPagePath(), genesis2.getUseHttps(), genesis2.getUsePrefix());
         
         if (strict)
@@ -403,7 +403,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
              (chargeBasisPoints>COINSPARK_GENESIS_CHARGE_BASIS_POINTS_MAX) )
             return false;
         
-        CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
+        CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
         if (!assetWebPage.isValid())
             return false;
         
@@ -549,7 +549,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
             HashLen-=COINSPARK_GENESIS_CHARGE_BPS_LENGTH;
 
         
-        CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
+        CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
         HashLen-=assetWebPage.encodedLen();
 
         if (HashLen > COINSPARK_GENESIS_HASH_MAX_LEN)
@@ -712,7 +712,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
     
     public String calcAssetURL(String FirstSpentTxID,long FirstSpentVout)
     {
-        CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
+        CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
         return assetWebPage.getAssetURL(FirstSpentTxID, FirstSpentVout);
     }    
     
@@ -725,7 +725,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
     
     public String getDomainURL()
     {
-        CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
+        CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
         return assetWebPage.getDomainURL();
     }    
     
@@ -739,6 +739,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
      * @param name asset name
      * @param issuer issuer name
      * @param description asset description
+     * @param units asset units
      * @param issueDate issue data
      * @param expiryDate expiry date, if not specified pass null or zero-length String
      * @param interestRate interest rate
@@ -853,7 +854,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
     private short chargeBasisPoints; // one hundredths of a percent
     private byte[] assetHash = new byte[COINSPARK_GENESIS_HASH_MAX_LEN];
     private int assetHashLen; // number of bytes in assetHash that are valid for comparison
-//    private CoinSparkAssetWebPage assetWebPage;
+//    private CoinSparkDomainPath assetWebPage;
     private String domainName;
     private String pagePath;
     private boolean useHttps;
@@ -897,7 +898,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
             }
 
             //  Asset web page
-            CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
+            CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
             if (!assetWebPage.encode(buffer))
                 throw new CoinSparkExceptions.CannotEncode("cannot write domain name/path");
 
@@ -999,7 +1000,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
 
             //  Domain name
             
-            CoinSparkAssetWebPage assetWebPage=new CoinSparkAssetWebPage(domainName, pagePath, useHttps, usePrefix);
+            CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
             if (!assetWebPage.decode(buffer))
                 throw new CoinSparkExceptions.CannotDecode("cannot decode domain name");
 
