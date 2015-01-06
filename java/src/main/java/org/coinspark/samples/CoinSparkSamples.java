@@ -1,7 +1,7 @@
 /*
- * CoinSpark 1.0 - Java sample code
+ * CoinSpark 2.0 - Java sample code
  *
- * Copyright (c) 2014 Coin Sciences Ltd
+ * Copyright (c) Coin Sciences Ltd
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal

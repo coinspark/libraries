@@ -1,4 +1,4 @@
-CoinSpark libraries README - coinspark.org
+CoinSpark libraries README - http://coinspark.org/
 
 
 ABOUT
@@ -12,7 +12,7 @@ The libraries are available in 5 languages:
 * Java
 * Javascript
 * PHP (5+)
-* Python (2.5+, 3+)
+* Python (2.5+, 3+) [does not yet support messaging]
 
 The libraries for each language are functionally identical, and use as similar
 calling conventions as possible, given the constraints imposed by each language. 
@@ -71,26 +71,6 @@ diff MessageHash-Output-C.txt MessageHash-Output-PHP.txt
 
 * Feel free to look inside the input and output files to see what is going on.
 
-* Python tests run similarly to PHP. First, create Python outputs:
-
-python ../python/coinspark-test.py Address-Input.txt > Address-Output-Python.txt
-python ../python/coinspark-test.py AssetRef-Input.txt > AssetRef-Output-Python.txt
-python ../python/coinspark-test.py Script-Input.txt > Script-Output-Python.txt
-python ../python/coinspark-test.py AssetHash-Input.txt > AssetHash-Output-Python.txt
-python ../python/coinspark-test.py Genesis-Input.txt > Genesis-Output-Python.txt
-python ../python/coinspark-test.py Transfer-Input.txt > Transfer-Output-Python.txt
-
-* Now check the corresponding Python and C output files for differencess
-
-diff Address-Output-C.txt Address-Output-Python.txt
-diff AssetRef-Output-C.txt AssetRef-Output-Python.txt
-diff Script-Output-C.txt Script-Output-Python.txt
-diff AssetHash-Output-C.txt AssetHash-Output-Python.txt
-diff Genesis-Output-C.txt Genesis-Output-Python.txt
-diff Transfer-Output-C.txt Transfer-Output-Python.txt
-
-* If no differences were reported, the library has passed the C-Python consistency test.
-
 * Java tests begin by compiling the Java classes:
 
 javac ../java/src/main/java/org/coinspark/protocol/*.java
@@ -107,6 +87,7 @@ diff Script-Output-C.txt Script-Output-Java.txt
 diff AssetHash-Output-C.txt AssetHash-Output-Java.txt
 diff Genesis-Output-C.txt Genesis-Output-Java.txt
 diff Transfer-Output-C.txt Transfer-Output-Java.txt
+diff MessageHash-Output-C.txt MessageHash-Output-Java.txt
 
 * If no differences were reported, the library has passed the C-Java consistency test.
 
@@ -123,10 +104,39 @@ in the right-hand side of the page can be compared against the appropriate
 
 
 
+
+# # # # # Python messaging support to be added shortly - for now these will not all pass # # # # #
+
+* Python tests run similarly to PHP. First, create Python outputs:
+
+python ../python/coinspark-test.py Address-Input.txt > Address-Output-Python.txt
+python ../python/coinspark-test.py AssetRef-Input.txt > AssetRef-Output-Python.txt
+python ../python/coinspark-test.py Script-Input.txt > Script-Output-Python.txt
+python ../python/coinspark-test.py AssetHash-Input.txt > AssetHash-Output-Python.txt
+python ../python/coinspark-test.py Genesis-Input.txt > Genesis-Output-Python.txt
+python ../python/coinspark-test.py Transfer-Input.txt > Transfer-Output-Python.txt
+python ../python/coinspark-test.py MessageHash-Input.txt > MessageHash-Output-Python.txt
+
+* Now check the corresponding Python and C output files for differencess
+
+diff Address-Output-C.txt Address-Output-Python.txt
+diff AssetRef-Output-C.txt AssetRef-Output-Python.txt
+diff Script-Output-C.txt Script-Output-Python.txt
+diff AssetHash-Output-C.txt AssetHash-Output-Python.txt
+diff Genesis-Output-C.txt Genesis-Output-Python.txt
+diff Transfer-Output-C.txt Transfer-Output-Python.txt
+
+* If no differences were reported, the library has passed the C-Python consistency test.
+
+# # # # # Python support to be added shortly - for now these will not all pass # # # # #
+
+
+
+
 LICENSE (MIT)
 -------------
 
-Copyright (c) 2014 Coin Sciences Ltd
+Copyright (c) Coin Sciences Ltd
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -149,6 +159,9 @@ THE SOFTWARE.
 
 CHANGELOG
 ---------
+
+v2.0 - 6 January 2015
+* Added support for CoinSpark messaging, Python to come
 
 v1.0.4 - 24 November 2014
 * Fixed typo in PHP's CoinSparkQueryAssetTrackingServer() function

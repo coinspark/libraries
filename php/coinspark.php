@@ -1,7 +1,7 @@
 <?php
 
 /*
- * CoinSpark 1.5 - PHP library
+ * CoinSpark 2.0 - PHP library
  *
  * Copyright (c) Coin Sciences Ltd
  * 

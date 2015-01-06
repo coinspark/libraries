@@ -1,5 +1,5 @@
 /*
- * CoinSpark 1.5 - C test suite
+ * CoinSpark 2.0 - C test suite
  *
  * Copyright (c) Coin Sciences Ltd
  * 

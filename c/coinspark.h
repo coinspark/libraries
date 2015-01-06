@@ -1,5 +1,5 @@
 /*
- * CoinSpark 1.5 - C library
+ * CoinSpark 2.0 - C library
  *
  * Copyright (c) Coin Sciences Ltd
  * 
