@@ -57,6 +57,8 @@ COINSPARK_IO_INDEX_MAX = 65535
 	
 COINSPARK_ADDRESS_FLAG_ASSETS = 1
 COINSPARK_ADDRESS_FLAG_PAYMENT_REFS = 2
+COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES = 4
+COINSPARK_ADDRESS_FLAG_FILE_MESSAGES = 8
 COINSPARK_ADDRESS_FLAG_MASK = 0x7FFFFF # 23 bits are currently usable
 
 
@@ -694,10 +696,12 @@ class CoinSparkAddress(CoinSparkBase):
 
 		
 	def toString(self):
-		flagsToStrings={
-			COINSPARK_ADDRESS_FLAG_ASSETS: "assets",
-			COINSPARK_ADDRESS_FLAG_PAYMENT_REFS: "payment references"
-		}
+		flagsToStrings=[
+			(COINSPARK_ADDRESS_FLAG_ASSETS, "assets"),
+			(COINSPARK_ADDRESS_FLAG_PAYMENT_REFS, "payment references"),
+			(COINSPARK_ADDRESS_FLAG_TEXT_MESSAGES, "text messages"),
+			(COINSPARK_ADDRESS_FLAG_FILE_MESSAGES, "file messages")
+		]
 		
 		buffer="COINSPARK ADDRESS\n"
 		buffer+="  Bitcoin address: %s\n" % self.bitcoinAddress
@@ -705,7 +709,7 @@ class CoinSparkAddress(CoinSparkBase):
 		
 		flagOutput=False
 		
-		for flag, string in flagsToStrings.items():
+		for (flag, string) in flagsToStrings:
 			if self.addressFlags & flag:
 				buffer+=(", " if flagOutput else " [")+string
 				flagOutput=True
