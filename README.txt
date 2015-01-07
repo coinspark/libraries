@@ -105,7 +105,7 @@ in the right-hand side of the page can be compared against the appropriate
 
 
 
-# # # # # Python messaging support to be added shortly - for now these will not all pass # # # # #
+# # # # # Python messaging support to be added shortly - for now these will not all pass
 
 * Python tests run similarly to PHP. First, create Python outputs:
 
@@ -129,7 +129,7 @@ diff MessageHash-Output-C.txt MessageHash-Output-Python.txt
 
 * If no differences were reported, the library has passed the C-Python consistency test.
 
-# # # # # Python support to be added shortly - for now these will not all pass # # # # #
+# # # # # Python messaging support to be added shortly - for now these will not all pass
 
 
 
