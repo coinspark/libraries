@@ -221,7 +221,7 @@ public class CoinSparkPacking {
         return range;
     }
     
-    protected static int [] packingExtendAddByteCounts(int packingExtend,int firstBytes, int countBytes)
+    protected static int [] packingExtendAddByteCounts(int packingExtend,int firstBytes, int countBytes, boolean forMessages)
     {
         int [] result=new int[3];
         
@@ -232,7 +232,8 @@ public class CoinSparkPacking {
         switch (packingExtend)
         {
             case COINSPARK_PACKING_EXTEND_0_1_BYTE:
-                result[2]=1;
+                if (forMessages) // otherwise it's really COINSPARK_PACKING_EXTEND_1S
+	                result[2]=1;
                 break;
 		
             case COINSPARK_PACKING_EXTEND_1_0_BYTE:
@@ -262,7 +263,7 @@ public class CoinSparkPacking {
         return result;
     }
     
-    protected static PackingByteCounts packingToByteCounts(byte packing, byte packingExtend)
+    protected static PackingByteCounts transferPackingToByteCounts(byte packing, byte packingExtend)
     {
         //  Set default values for bytes for all fields to zero
         
@@ -299,13 +300,13 @@ public class CoinSparkPacking {
             
             //  Input indices
             countsBytes=packingExtendAddByteCounts(((packingExtend >> COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK),
-                counts.firstInputBytes,counts.countInputsBytes);
+                counts.firstInputBytes,counts.countInputsBytes, false);
             counts.firstInputBytes=countsBytes[1];
             counts.countInputsBytes=countsBytes[2];
             
             //  Output indices
             countsBytes=packingExtendAddByteCounts(((packingExtend >> COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK),
-                counts.firstOutputBytes,counts.countOutputsBytes);
+                counts.firstOutputBytes,counts.countOutputsBytes, false);
             counts.firstOutputBytes=countsBytes[1];
             counts.countOutputsBytes=countsBytes[2];
             

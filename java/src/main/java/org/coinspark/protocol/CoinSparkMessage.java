@@ -659,7 +659,7 @@ public class CoinSparkMessage extends CoinSparkBase{
             if (packingExtend == null)
                 return null;
 
-            result=CoinSparkPacking.packingExtendAddByteCounts(packingExtend, result[1], result[2]);
+            result=CoinSparkPacking.packingExtendAddByteCounts(packingExtend, result[1], result[2], true);
 
             packing=COINSPARK_OUTPUTS_TYPE_EXTEND | (packingExtend & COINSPARK_OUTPUTS_VALUE_MASK);
         }
@@ -812,7 +812,7 @@ public class CoinSparkMessage extends CoinSparkBase{
 						
                         outputRange=CoinSparkPacking.packingTypeToValues(extendPackingType, null, countOutputs);
 
-                        int result [] =CoinSparkPacking.packingExtendAddByteCounts(packingValue, firstBytes, countBytes);
+                        int result [] =CoinSparkPacking.packingExtendAddByteCounts(packingValue, firstBytes, countBytes, true);
                         firstBytes = result[1];				
                         countBytes = result[2];				
                     } 

@@ -125,6 +125,7 @@ diff Script-Output-C.txt Script-Output-Python.txt
 diff AssetHash-Output-C.txt AssetHash-Output-Python.txt
 diff Genesis-Output-C.txt Genesis-Output-Python.txt
 diff Transfer-Output-C.txt Transfer-Output-Python.txt
+diff MessageHash-Output-C.txt MessageHash-Output-Python.txt
 
 * If no differences were reported, the library has passed the C-Python consistency test.
 
@@ -159,6 +160,9 @@ THE SOFTWARE.
 
 CHANGELOG
 ---------
+
+v2.0.1 - 7 January 2015
+* Fixed byte length bug in transfers for a particular encoding variety
 
 v2.0 - 6 January 2015
 * Added support for CoinSpark messaging, Python to come

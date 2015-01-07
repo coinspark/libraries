@@ -1580,9 +1580,9 @@
 	
 			if (($packing & self::COINSPARK_PACKING_INDICES_MASK) == self::COINSPARK_PACKING_INDICES_EXTEND) {
 				$this->packingExtendAddByteCounts(($packingExtend >> self::COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) &
-					self::COINSPARK_PACKING_EXTEND_MASK, $counts['firstInputBytes'], $counts['countInputsBytes']);
+					self::COINSPARK_PACKING_EXTEND_MASK, $counts['firstInputBytes'], $counts['countInputsBytes'], false);
 				$this->packingExtendAddByteCounts(($packingExtend >> self::COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) &
-					self::COINSPARK_PACKING_EXTEND_MASK, $counts['firstOutputBytes'], $counts['countOutputsBytes']);
+					self::COINSPARK_PACKING_EXTEND_MASK, $counts['firstOutputBytes'], $counts['countOutputsBytes'], false);
 			}
 	
 		//  Packing for quantity
@@ -2295,7 +2295,7 @@
 							return false;
 						
 						$outputRange=$this->packingTypeToValues($extendPackingType, null, $countOutputs);
-						$this->packingExtendAddByteCounts($packingValue, $firstBytes, $countBytes);
+						$this->packingExtendAddByteCounts($packingValue, $firstBytes, $countBytes, true);
 				
 					} else
 						return false; // will be self::COINSPARK_OUTPUTS_TYPE_UNUSED
@@ -2391,7 +2391,7 @@
 				if (!isset($packingExtend))
 					return null;
 		
-				$this->packingExtendAddByteCounts($packingExtend, $firstBytes, $countBytes);
+				$this->packingExtendAddByteCounts($packingExtend, $firstBytes, $countBytes, true);
 		
 				$packing=self::COINSPARK_OUTPUTS_TYPE_EXTEND | ($packingExtend & self::COINSPARK_OUTPUTS_VALUE_MASK);
 			}
@@ -2999,11 +2999,12 @@
 			return $range;
 		}
 		
-		protected function packingExtendAddByteCounts($packingExtend, &$firstBytes, &$countBytes)
+		protected function packingExtendAddByteCounts($packingExtend, &$firstBytes, &$countBytes, $forMessages)
 		{
 			switch ($packingExtend) {
 				case self::COINSPARK_PACKING_EXTEND_0_1_BYTE:
-					$countBytes=1;
+					if ($forMessages) // otherwise it's really COINSPARK_PACKING_EXTEND_1S
+						$countBytes=1;
 					break;
 				
 				case self::COINSPARK_PACKING_EXTEND_1_0_BYTE:

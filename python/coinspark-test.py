@@ -44,8 +44,8 @@ def ProcessInputContents(inputSource):
 	elif header=='CoinSpark Script Tests Input':
 		ProcessScriptTests(inputSource)
 		
-	elif header=='CoinSpark Hash Tests Input':
-		ProcessHashTests(inputSource)
+	elif header=='CoinSpark AssetHash Tests Input':
+		ProcessAssetHashTests(inputSource)
 		
 	elif header=='CoinSpark Genesis Tests Input':
 		ProcessGenesisTests(inputSource)
@@ -226,8 +226,8 @@ def ProcessScriptTests(inputSource):
 			
 
 
-def ProcessHashTests(inputSource):
-	print("CoinSpark Hash Tests Output\n")
+def ProcessAssetHashTests(inputSource):
+	print("CoinSpark AssetHash Tests Output\n")
 	
 	while True:
 		inputLines=GetNextInputLines(inputSource, 10)

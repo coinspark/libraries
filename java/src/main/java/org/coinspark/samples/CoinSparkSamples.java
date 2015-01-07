@@ -133,6 +133,10 @@ public class CoinSparkSamples {
             CoinSparkPaymentRef paymentRef=new CoinSparkPaymentRef();
             if (paymentRef.decode(metadata))
                 System.out.print(paymentRef.toString());
+
+            CoinSparkMessage message=new CoinSparkMessage();
+            if (message.decode(metadata))
+                System.out.print(message.toString());
         }
     }
     

@@ -573,11 +573,12 @@ static void PackingTypeToValues(const PackingType packingType, const CoinSparkIO
     }
 }
 
-static void PackingExtendAddByteCounts(char packingExtend, size_t* firstBytes, size_t* countBytes)
+static void PackingExtendAddByteCounts(char packingExtend, size_t* firstBytes, size_t* countBytes, bool forMessages)
 {
     switch (packingExtend) {
         case COINSPARK_PACKING_EXTEND_0_1_BYTE:
-            *countBytes=1;
+            if (forMessages) // otherwise it's really COINSPARK_PACKING_EXTEND_1S
+                *countBytes=1;
             break;
             
         case COINSPARK_PACKING_EXTEND_1_0_BYTE:
@@ -605,7 +606,7 @@ static void PackingExtendAddByteCounts(char packingExtend, size_t* firstBytes, s
     }
 }
 
-static void PackingToByteCounts(char packing, char packingExtend, PackingByteCounts* counts)
+static void TransferPackingToByteCounts(char packing, char packingExtend, PackingByteCounts* counts)
 {
     
 //  Set default values for bytes for all fields to zero
@@ -648,9 +649,9 @@ static void PackingToByteCounts(char packing, char packingExtend, PackingByteCou
     
     if ((packing & COINSPARK_PACKING_INDICES_MASK) == COINSPARK_PACKING_INDICES_EXTEND) {
         PackingExtendAddByteCounts((packingExtend >> COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK,
-            &counts->firstInputBytes, &counts->countInputsBytes);
+            &counts->firstInputBytes, &counts->countInputsBytes, FALSE);
         PackingExtendAddByteCounts((packingExtend >> COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & COINSPARK_PACKING_EXTEND_MASK,
-            &counts->firstOutputBytes, &counts->countOutputsBytes);
+            &counts->firstOutputBytes, &counts->countOutputsBytes, FALSE);
     }
     
 //  Packing for quantity
@@ -730,7 +731,7 @@ static bool GetMessageOutputRangePacking(const CoinSparkIORange *outputRange, in
         if (!EncodePackingExtend(packingOptions, &packingExtend))
             return FALSE;
         
-        PackingExtendAddByteCounts(packingExtend, firstBytes, countBytes);
+        PackingExtendAddByteCounts(packingExtend, firstBytes, countBytes, TRUE);
         
         *packing=COINSPARK_OUTPUTS_TYPE_EXTEND | (packingExtend & COINSPARK_OUTPUTS_VALUE_MASK);
     }
@@ -2478,7 +2479,7 @@ static size_t CoinSparkTransferEncode(const CoinSparkTransfer* transfer, const C
                 goto cannotEncodeTransfer; \
         }
     
-    PackingToByteCounts(packing, packingExtend, &counts);
+    TransferPackingToByteCounts(packing, packingExtend, &counts);
     
     WRITE_BYTE_FIELD(1, packing);
    
@@ -2645,7 +2646,7 @@ static size_t CoinSparkTransferDecode(const char* metadata, const size_t metadat
     
 //  Read in the fields as appropriate
     
-    PackingToByteCounts(packing, packingExtend, &counts);
+    TransferPackingToByteCounts(packing, packingExtend, &counts);
     
     #define READ_BYTE_FIELD(bytes, destination) \
         if (bytes>0) { \
@@ -3329,7 +3330,7 @@ bool CoinSparkMessageDecode(CoinSparkMessage* message, const int countOutputs, c
                     goto cannotDecodeMessage;
                 
                 PackingTypeToValues(extendPackingType, NULL, countOutputs, outputRange);
-                PackingExtendAddByteCounts(packingValue, &firstBytes, &countBytes);
+                PackingExtendAddByteCounts(packingValue, &firstBytes, &countBytes, TRUE);
                 
             } else
                 goto cannotDecodeMessage; // will be COINSPARK_OUTPUTS_TYPE_UNUSED

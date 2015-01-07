@@ -1448,13 +1448,13 @@ CoinSparkTransfer.prototype.packingToByteCounts=function(packing, packingExtend)
 
 	if ((packing & this.COINSPARK_PACKING_INDICES_MASK) == this.COINSPARK_PACKING_INDICES_EXTEND) {
 		var getCounts=this.packingExtendAddByteCounts((packingExtend >> this.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) &
-			this.COINSPARK_PACKING_EXTEND_MASK, counts['firstInputBytes'], counts['countInputsBytes']);
+			this.COINSPARK_PACKING_EXTEND_MASK, counts['firstInputBytes'], counts['countInputsBytes'], false);
 		
 		counts['firstInputBytes']=getCounts['firstBytes'];
 		counts['countInputsBytes']=getCounts['countBytes'];
 		
 		getCounts=this.packingExtendAddByteCounts((packingExtend >> this.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) &
-			this.COINSPARK_PACKING_EXTEND_MASK, counts['firstOutputBytes'], counts['countOutputsBytes']);
+			this.COINSPARK_PACKING_EXTEND_MASK, counts['firstOutputBytes'], counts['countOutputsBytes'], false);
 			
 		counts['firstOutputBytes']=getCounts['firstBytes'];
 		counts['countOutputsBytes']=getCounts['countBytes'];
@@ -2180,7 +2180,7 @@ CoinSparkMessage.prototype.decode=function(metadata, countOutputs)
 				
 				var outputRange=this.packingTypeToValues(extendPackingType, null, countOutputs);
 
-				var getCounts=this.packingExtendAddByteCounts(packingValue, firstBytes, countBytes);
+				var getCounts=this.packingExtendAddByteCounts(packingValue, firstBytes, countBytes, true);
 				firstBytes=getCounts['firstBytes'];
 				countBytes=getCounts['countBytes'];
 		
@@ -2280,7 +2280,7 @@ CoinSparkMessage.prototype.getOutputRangePacking=function(outputRange, countOutp
 		if (packingExtend===null)
 			return null;
 
-		var packingResult=this.packingExtendAddByteCounts(packingExtend, firstBytes, countBytes);
+		var packingResult=this.packingExtendAddByteCounts(packingExtend, firstBytes, countBytes, true);
 		firstBytes=packingResult['firstBytes'];
 		countBytes=packingResult['countBytes'];
 
@@ -2907,12 +2907,13 @@ CoinSparkBase.prototype.packingTypeToValues=function(packingType, previousRange,
 	return range;
 }
 
-CoinSparkBase.prototype.packingExtendAddByteCounts=function(packingExtend, firstBytes, countBytes)
+CoinSparkBase.prototype.packingExtendAddByteCounts=function(packingExtend, firstBytes, countBytes, forMessages)
 {
 	switch (packingExtend)
 	{
 		case this.COINSPARK_PACKING_EXTEND_0_1_BYTE:
-			countBytes=1;
+			if (forMessages) // otherwise it's really COINSPARK_PACKING_EXTEND_1S
+				countBytes=1;
 			break;
 		
 		case this.COINSPARK_PACKING_EXTEND_1_0_BYTE:

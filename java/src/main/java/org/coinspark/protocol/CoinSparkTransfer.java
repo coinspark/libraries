@@ -436,7 +436,7 @@ public class CoinSparkTransfer extends CoinSparkBase{
 
             //  Write out the actual data
 
-            CoinSparkPacking.PackingByteCounts counts = CoinSparkPacking.packingToByteCounts(packing, packingExtend);  
+            CoinSparkPacking.PackingByteCounts counts = CoinSparkPacking.transferPackingToByteCounts(packing, packingExtend);  
 
             buffer.writeByte(packing);
 
@@ -571,7 +571,7 @@ public class CoinSparkTransfer extends CoinSparkBase{
 
             //  Read in the fields as appropriate
             
-            CoinSparkPacking.PackingByteCounts counts = CoinSparkPacking.packingToByteCounts(packing, packingExtend);  
+            CoinSparkPacking.PackingByteCounts counts = CoinSparkPacking.transferPackingToByteCounts(packing, packingExtend);  
             
             long[] resLong = new long[1];
             if (counts.blockNumBytes>0)
