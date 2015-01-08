@@ -135,7 +135,7 @@ public class CoinSparkSamples {
                 System.out.print(paymentRef.toString());
 
             CoinSparkMessage message=new CoinSparkMessage();
-            if (message.decode(metadata))
+            if (message.decode(metadata,scriptPubKeys.length))
                 System.out.print(message.toString());
         }
     }
