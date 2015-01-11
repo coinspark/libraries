@@ -1,6 +1,6 @@
-# CoinSpark 1.0 - Python library
+# CoinSpark 2.0 - Python library
 #
-# Copyright (c) 2014 Coin Sciences Ltd
+# Copyright (c) Coin Sciences Ltd
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -21,7 +21,7 @@
 # THE SOFTWARE.
 
 
-import math, string, re, hashlib, binascii, random
+import math, string, re, hashlib, binascii, random, copy
 
 
 # Quasi-constants for use by clients of the library
@@ -53,6 +53,12 @@ COINSPARK_ASSETREF_TXID_PREFIX_LEN = 2
 
 COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE = -1 # magic number for a default route
 
+COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN = 32
+COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN = 24
+COINSPARK_MESSAGE_HASH_MIN_LEN = 12
+COINSPARK_MESSAGE_HASH_MAX_LEN = 32
+COINSPARK_MESSAGE_MAX_IO_RANGES = 16
+
 COINSPARK_IO_INDEX_MAX = 65535
 	
 COINSPARK_ADDRESS_FLAG_ASSETS = 1
@@ -75,11 +81,12 @@ COINSPARK_LENGTH_PREFIX_MAX = 96
 COINSPARK_GENESIS_PREFIX = 'g'
 COINSPARK_TRANSFERS_PREFIX = 't'
 COINSPARK_PAYMENTREF_PREFIX = 'r'
+COINSPARK_MESSAGE_PREFIX = 'm'
 
 COINSPARK_FEE_BASIS_MAX_SATOSHIS = 1000
 
-COINSPARK_INTEGER_TO_BASE_58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-
+COINSPARK_INTEGER_TO_BASE_58="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+	
 COINSPARK_DOMAIN_PACKING_PREFIX_MASK = 0xC0
 COINSPARK_DOMAIN_PACKING_PREFIX_SHIFT = 6
 COINSPARK_DOMAIN_PACKING_SUFFIX_MASK = 0x3F
@@ -258,11 +265,35 @@ def CoinSparkCalcAssetHash(name, issuer, description, units, issueDate, expiryDa
 	return hashlib.sha256(buffer).digest()
 
 
+def CoinSparkCalcMessageHash(salt, messageParts):
+	zeroByteArray="\x00".encode('utf-8')
+	
+	buffer=salt+zeroByteArray
+	
+	for messagePart in messageParts:
+		buffer+=messagePart['mimeType'].encode('utf-8')+zeroByteArray
+		buffer+=(messagePart['fileName'].encode('utf-8') if 'fileName' in messagePart else [])+zeroByteArray
+		buffer+=messagePart['content']+zeroByteArray
+		
+	return hashlib.sha256(buffer).digest()
+	
+
 # Base class implementing utility functions used internally
 
 class CoinSparkBase:
-	COINSPARK_INTEGER_TO_BASE_58="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-	
+
+	COINSPARK_PACKING_EXTEND_MASK=0x07
+	COINSPARK_PACKING_EXTEND_0P=0x00 # index 0 only or previous (transfers only)
+	COINSPARK_PACKING_EXTEND_PUBLIC=0x00 # this is public (messages only)
+	COINSPARK_PACKING_EXTEND_1S=0x01 # index 1 or subsequent to previous (transfers only)
+	COINSPARK_PACKING_EXTEND_0_1_BYTE=0x01 # starting at 0, 1 byte for count (messages only)
+	COINSPARK_PACKING_EXTEND_1_0_BYTE=0x02 # 1 byte for single index, count is 1
+	COINSPARK_PACKING_EXTEND_2_0_BYTES=0x03 # 2 bytes for single index, count is 1
+	COINSPARK_PACKING_EXTEND_1_1_BYTES=0x04 # 1 byte for first index, 1 byte for count
+	COINSPARK_PACKING_EXTEND_2_1_BYTES=0x05 # 2 bytes for first index, 1 byte for count
+	COINSPARK_PACKING_EXTEND_2_2_BYTES=0x06 # 2 bytes for first index, 2 bytes for count
+	COINSPARK_PACKING_EXTEND_ALL=0x07 # all inputs|outputs
+
 	def isInteger(self, value):
 		return isinstance(value, int) or isinstance(value, long) or (isinstance(value, float) and (value%1==0))
 		
@@ -312,7 +343,7 @@ class CoinSparkBase:
 	
 
 	def base58ToInteger(self, base58Character):
-		integer=self.COINSPARK_INTEGER_TO_BASE_58.find(base58Character)
+		integer=COINSPARK_INTEGER_TO_BASE_58.find(base58Character)
 		
 		return None if integer<0 else integer
 		
@@ -676,6 +707,183 @@ class CoinSparkBase:
 		result['decodedChars']=startLength-len(metadata)
 
 		return result
+		
+	
+	def normalizeIORanges(self, inRanges):
+		countRanges=len(inRanges)
+		if countRanges==0:
+			return inRanges
+		
+		rangeUsed=[False]*countRanges
+		outRanges=[]
+		countRemoved=0
+
+		for orderIndex in range(countRanges):
+			lowestRangeFirst=0
+			lowestRangeIndex=-1
+
+			for rangeIndex in range(countRanges):
+				if not rangeUsed[rangeIndex]:
+					if (lowestRangeIndex==-1) or (inRanges[rangeIndex].first<lowestRangeFirst):
+						lowestRangeFirst=inRanges[rangeIndex].first
+						lowestRangeIndex=rangeIndex
+
+			if (orderIndex>0) and (inRanges[lowestRangeIndex].first<=lastRangeEnd): # we can combine two adjacent ranges
+				countRemoved+=1
+				thisRangeEnd=inRanges[lowestRangeIndex].first+inRanges[lowestRangeIndex].count
+				outRanges[orderIndex-countRemoved].count=max(lastRangeEnd, thisRangeEnd)-outRanges[orderIndex-countRemoved].first
+
+			else:
+				outRanges.append(copy.copy(inRanges[lowestRangeIndex]))
+	
+			lastRangeEnd=outRanges[orderIndex-countRemoved].first+outRanges[orderIndex-countRemoved].count
+			rangeUsed[lowestRangeIndex]=True
+
+		return outRanges
+		
+
+	def getPackingOptions(self, previousRange, range, countInputsOutputs, forMessages):
+		packingOptions={}
+	
+		firstZero=(range.first==0)
+		firstByte=(range.first<=COINSPARK_UNSIGNED_BYTE_MAX)
+		first2Bytes=(range.first<=COINSPARK_UNSIGNED_2_BYTES_MAX)
+		countOne=(range.count==1)
+		countByte=(range.count<=COINSPARK_UNSIGNED_BYTE_MAX)
+		
+		if forMessages:
+			packingOptions['_0P']=False
+			packingOptions['_1S']=False # these two options not used for messages
+			packingOptions['_0_1_BYTE']=firstZero and countByte
+		
+		else:
+			if previousRange:
+				packingOptions['_0P']=(range.first==previousRange.first) and (range.count==previousRange.count)
+				packingOptions['_1S']=(range.first==(previousRange.first+previousRange.count)) and countOne
+		
+			else:
+				packingOptions['_0P']=firstZero and countOne
+				packingOptions['_1S']=(range.first==1) and countOne
+				
+			packingOptions['_0_1_BYTE']=False # this option not used for transfers
+
+		packingOptions['_1_0_BYTE']=firstByte and countOne
+		packingOptions['_2_0_BYTES']=first2Bytes and countOne
+		packingOptions['_1_1_BYTES']=firstByte and countByte
+		packingOptions['_2_1_BYTES']=first2Bytes and countByte
+		packingOptions['_2_2_BYTES']=first2Bytes and (range.count<=COINSPARK_UNSIGNED_2_BYTES_MAX)
+		packingOptions['_ALL']=firstZero and (range.count>=int(countInputsOutputs))
+	
+		return packingOptions
+
+
+	def packingTypeToValues(self, packingType, previousRange, countInputOutputs):
+		range=CoinSparkIORange()
+		
+		if packingType=='_0P':
+			if previousRange:
+				range.first=previousRange.first
+				range.count=previousRange.count
+			else:
+				range.first=0
+				range.count=1
+
+		elif packingType=='_1S':
+			if previousRange:
+				range.first=previousRange.first+previousRange.count
+			else:
+				range.first=1
+
+			range.count=1
+
+		elif packingType=='_0_1_BYTE':
+			range.first=0
+		
+		elif (packingType=='_1_0_BYTE') or (packingType=='_2_0_BYTES'):
+			range.count=1
+
+		elif packingType=='_ALL':
+			range.first=0
+			range.count=int(countInputOutputs)
+	
+		return range
+
+
+	def packingExtendAddByteCounts(self, packingExtend, firstBytes, countBytes, forMessages):
+		if packingExtend==self.COINSPARK_PACKING_EXTEND_0_1_BYTE:
+			if (forMessages): # otherwise it's really COINSPARK_PACKING_EXTEND_1S
+				countBytes=1
+		
+		elif packingExtend==self.COINSPARK_PACKING_EXTEND_1_0_BYTE:
+			firstBytes=1
+
+		elif packingExtend==self.COINSPARK_PACKING_EXTEND_2_0_BYTES:
+			firstBytes=2
+
+		elif packingExtend==self.COINSPARK_PACKING_EXTEND_1_1_BYTES:
+			firstBytes=1
+			countBytes=1
+
+		elif packingExtend==self.COINSPARK_PACKING_EXTEND_2_1_BYTES:
+			firstBytes=2
+			countBytes=1
+
+		elif packingExtend==self.COINSPARK_PACKING_EXTEND_2_2_BYTES:
+			firstBytes=2
+			countBytes=2
+			
+		return {'firstBytes':firstBytes, 'countBytes':countBytes}
+		
+	
+	def getPackingExtendMap(self):
+		 return [
+			('_0P', self.COINSPARK_PACKING_EXTEND_0P),
+			('_1S', self.COINSPARK_PACKING_EXTEND_1S),
+			('_ALL', self.COINSPARK_PACKING_EXTEND_ALL),
+			('_1_0_BYTE', self.COINSPARK_PACKING_EXTEND_1_0_BYTE),
+			('_0_1_BYTE', self.COINSPARK_PACKING_EXTEND_0_1_BYTE),
+			('_2_0_BYTES', self.COINSPARK_PACKING_EXTEND_2_0_BYTES),
+			('_1_1_BYTES', self.COINSPARK_PACKING_EXTEND_1_1_BYTES),
+			('_2_1_BYTES', self.COINSPARK_PACKING_EXTEND_2_1_BYTES),
+			('_2_2_BYTES', self.COINSPARK_PACKING_EXTEND_2_2_BYTES)
+		] # in order of preference (use tuples since Python dictionaries are unordered)
+
+
+	def encodePackingExtend(self, packingOptions):
+		packingExtendMap=self.getPackingExtendMap()
+	
+		for (packingType, packingExtend) in packingExtendMap:
+			if packingOptions[packingType]:
+				return packingExtend
+			
+		return None
+
+
+	def decodePackingExtend(self, packingExtend, forMessages):
+		packingExtendMap=self.getPackingExtendMap()
+	
+		for (packingType, packingExtendTest) in packingExtendMap:
+			if packingExtend==packingExtendTest:
+				if (packingType!=('_1S' if forMessages else '_0_1_BYTE')): # no _1S for messages, no _0_1_BYTE for transfers
+					return packingType
+			
+		return None
+
+
+	def writeUnsignedField(self, bytes, source):
+		return self.writeSmallEndianUnsigned(source, bytes) if (bytes>0) else '' # will return None on failure
+
+
+	def shiftReadUnsignedField(self, metadataArray, bytes, object, property):
+		if bytes>0:
+			value=self.readSmallEndianUnsigned(metadataArray[:bytes], bytes)
+			del metadataArray[:bytes]
+			if value is None:
+				return False
+			
+			setattr(object, property, value)
+	
+		return True
 
 
 # CoinSparkAddress class for managing CoinSpark addresseses
@@ -796,7 +1004,7 @@ class CoinSparkAddress(CoinSparkBase):
 		
 		string=self.COINSPARK_ADDRESS_PREFIX
 		for charValue in stringBase58[1:stringLen]:
-			string+=self.COINSPARK_INTEGER_TO_BASE_58[charValue]
+			string+=COINSPARK_INTEGER_TO_BASE_58[charValue]
 			
 		return string
 		
@@ -872,7 +1080,7 @@ class CoinSparkAddress(CoinSparkBase):
 			if extraDataChars>0:
 				charValue-=stringBase58[2+charIndex%extraDataChars]
 				
-			self.bitcoinAddress+=self.COINSPARK_INTEGER_TO_BASE_58[charValue%58]
+			self.bitcoinAddress+=COINSPARK_INTEGER_TO_BASE_58[charValue%58]
 		
 		
 		return self.isValid()
@@ -1184,7 +1392,7 @@ class CoinSparkGenesis(CoinSparkBase):
 		if decodedDomainPath is None:
 			return False
 
-		metadata=metadata[decodedDomainPath['decodedChars']:]			
+		metadata=metadata[decodedDomainPath['decodedChars']:]
 		self.useHttps=decodedDomainPath['useHttps']
 		self.domainName=decodedDomainPath['domainName']
 		self.usePrefix=decodedDomainPath['usePrefix']
@@ -1360,16 +1568,6 @@ class CoinSparkTransfer(CoinSparkBase):
 	COINSPARK_PACKING_EXTEND_INPUTS_SHIFT=3
 	COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT=0
 
-	COINSPARK_PACKING_EXTEND_MASK=0x07
-	COINSPARK_PACKING_EXTEND_0P=0x00 # index 0 only or previous
-	COINSPARK_PACKING_EXTEND_1S=0x01 # index 1 only or subsequent single
-	COINSPARK_PACKING_EXTEND_BYTE=0x02 # 1 byte for single index
-	COINSPARK_PACKING_EXTEND_2_BYTES=0x03 # 2 bytes for single index
-	COINSPARK_PACKING_EXTEND_1_1_BYTES=0x04 # 1 byte for first index, 1 byte for count
-	COINSPARK_PACKING_EXTEND_2_1_BYTES=0x05 # 2 bytes for first index, 1 byte for count
-	COINSPARK_PACKING_EXTEND_2_2_BYTES=0x06 # 2 bytes for first index, 2 bytes for count
-	COINSPARK_PACKING_EXTEND_ALL=0x07 # all inputs|outputs
-
 	COINSPARK_PACKING_QUANTITY_MASK=0x07
 	COINSPARK_PACKING_QUANTITY_1P=0x00 # quantity=1 or previous
 	COINSPARK_PACKING_QUANTITY_1_BYTE=0x01
@@ -1460,8 +1658,8 @@ class CoinSparkTransfer(CoinSparkBase):
 		
 		# Packing for input and output indices
 
-		inputPackingOptions=self.getPackingOptions(previousTransfer.inputs if previousTransfer else None, self.inputs, countInputs)
-		outputPackingOptions=self.getPackingOptions(previousTransfer.outputs if previousTransfer else None, self.outputs, countOutputs)
+		inputPackingOptions=self.getPackingOptions(previousTransfer.inputs if previousTransfer else None, self.inputs, countInputs, False)
+		outputPackingOptions=self.getPackingOptions(previousTransfer.outputs if previousTransfer else None, self.outputs, countOutputs, False)
 	
 		if inputPackingOptions['_0P'] and outputPackingOptions['_0P']:
 			packing|=self.COINSPARK_PACKING_INDICES_0P_0P
@@ -1584,8 +1782,8 @@ class CoinSparkTransfer(CoinSparkBase):
 			if packingExtend is None:
 				return 0
 			
-			inputPackingType=self.decodePackingExtend((packingExtend >> self.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & self.COINSPARK_PACKING_EXTEND_MASK)
-			outputPackingType=self.decodePackingExtend((packingExtend >> self.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & self.COINSPARK_PACKING_EXTEND_MASK)
+			inputPackingType=self.decodePackingExtend((packingExtend >> self.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & self.COINSPARK_PACKING_EXTEND_MASK, False)
+			outputPackingType=self.decodePackingExtend((packingExtend >> self.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & self.COINSPARK_PACKING_EXTEND_MASK, False)
 
 			if (inputPackingType is None) or (outputPackingType is None):
 				return 0
@@ -1649,8 +1847,8 @@ class CoinSparkTransfer(CoinSparkBase):
 		metadataArray=[metadataChar for metadataChar in metadata] # split into array of characters for next bit
 		
 		read_array=[
-			self.readUnsignedField(metadataArray, counts['blockNumBytes'], self.assetRef, 'blockNum'),
-			self.readUnsignedField(metadataArray, counts['txOffsetBytes'], self.assetRef, 'txOffset')
+			self.shiftReadUnsignedField(metadataArray, counts['blockNumBytes'], self.assetRef, 'blockNum'),
+			self.shiftReadUnsignedField(metadataArray, counts['txOffsetBytes'], self.assetRef, 'txOffset')
 		]
 		
 		if txIDPrefixBytes==0:
@@ -1661,11 +1859,11 @@ class CoinSparkTransfer(CoinSparkBase):
 			read_array.append(len(self.assetRef.txIDPrefix)==2*txIDPrefixBytes)
 				
 		read_array+=[
-			self.readUnsignedField(metadataArray, counts['firstInputBytes'], self.inputs, 'first'),
-			self.readUnsignedField(metadataArray, counts['countInputsBytes'], self.inputs, 'count'),
-			self.readUnsignedField(metadataArray, counts['firstOutputBytes'], self.outputs, 'first'),
-			self.readUnsignedField(metadataArray, counts['countOutputsBytes'], self.outputs, 'count'),
-			self.readUnsignedField(metadataArray, counts['quantityBytes'], self, 'qtyPerOutput')
+			self.shiftReadUnsignedField(metadataArray, counts['firstInputBytes'], self.inputs, 'first'),
+			self.shiftReadUnsignedField(metadataArray, counts['countInputsBytes'], self.inputs, 'count'),
+			self.shiftReadUnsignedField(metadataArray, counts['firstOutputBytes'], self.outputs, 'first'),
+			self.shiftReadUnsignedField(metadataArray, counts['countOutputsBytes'], self.outputs, 'count'),
+			self.shiftReadUnsignedField(metadataArray, counts['quantityBytes'], self, 'qtyPerOutput')
 		]
 		
 		metadata="".join(metadataArray) # convert any remaining characters back into the string
@@ -1751,62 +1949,6 @@ class CoinSparkTransfer(CoinSparkBase):
 		return buffer
 
 
-	def getPackingOptions(self, previousRange, range, countInputsOutputs):
-		packingOptions={}
-	
-		firstZero=(range.first==0)
-		firstByte=(range.first<=COINSPARK_UNSIGNED_BYTE_MAX)
-		first2Bytes=(range.first<=COINSPARK_UNSIGNED_2_BYTES_MAX)
-		countOne=(range.count==1)
-		countByte=(range.count<=COINSPARK_UNSIGNED_BYTE_MAX)
-	
-		if previousRange:
-			packingOptions['_0P']=(range.first==previousRange.first) and (range.count==previousRange.count)
-			packingOptions['_1S']=(range.first==(previousRange.first+previousRange.count)) and countOne
-		
-		else:
-			packingOptions['_0P']=firstZero and countOne
-			packingOptions['_1S']=(range.first==1) and countOne
-
-		packingOptions['_BYTE']=firstByte and countOne
-		packingOptions['_2_BYTES']=first2Bytes and countOne
-		packingOptions['_1_1_BYTES']=firstByte and countByte
-		packingOptions['_2_1_BYTES']=first2Bytes and countByte
-		packingOptions['_2_2_BYTES']=first2Bytes and (range.count<=COINSPARK_UNSIGNED_2_BYTES_MAX)
-		packingOptions['_ALL']=firstZero and (range.count>=int(countInputsOutputs))
-	
-		return packingOptions
-
-
-	def packingTypeToValues(self, packingType, previousRange, countInputOutputs):
-		range=CoinSparkIORange()
-		
-		if packingType=='_0P':
-			if previousRange:
-				range.first=previousRange.first
-				range.count=previousRange.count
-			else:
-				range.first=0
-				range.count=1
-
-		elif packingType=='_1S':
-			if previousRange:
-				range.first=previousRange.first+previousRange.count
-			else:
-				range.first=1
-
-			range.count=1
-
-		elif (packingType=='_BYTE') or (packingType=='_2_BYTES'):
-			range.count=1
-
-		elif packingType=='_ALL':
-			range.first=0
-			range.count=int(countInputOutputs)
-	
-		return range
-
-
 	def packingToByteCounts(self, packing, packingExtend):
 
 		# Set default values for bytes for all fields to zero
@@ -1846,50 +1988,17 @@ class CoinSparkTransfer(CoinSparkBase):
 		# Packing for input and output indices (relevant for extended indices only)
 
 		if (packing & self.COINSPARK_PACKING_INDICES_MASK) == self.COINSPARK_PACKING_INDICES_EXTEND:
-
-			# Input indices
+			getCounts=self.packingExtendAddByteCounts((packingExtend >> self.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) &
+				self.COINSPARK_PACKING_EXTEND_MASK, counts['firstInputBytes'], counts['countInputsBytes'], False)
+				
+			counts['firstInputBytes']=getCounts['firstBytes']
+			counts['countInputsBytes']=getCounts['countBytes']
 			
-			packingExtendInputs=(packingExtend >> self.COINSPARK_PACKING_EXTEND_INPUTS_SHIFT) & self.COINSPARK_PACKING_EXTEND_MASK
-
-			if packingExtendInputs==self.COINSPARK_PACKING_EXTEND_BYTE:
-				counts['firstInputBytes']=1
-	
-			elif packingExtendInputs==self.COINSPARK_PACKING_EXTEND_2_BYTES:
-				counts['firstInputBytes']=2
-	
-			elif packingExtendInputs==self.COINSPARK_PACKING_EXTEND_1_1_BYTES:
-				counts['firstInputBytes']=1
-				counts['countInputsBytes']=1
-	
-			elif packingExtendInputs==self.COINSPARK_PACKING_EXTEND_2_1_BYTES:
-				counts['firstInputBytes']=2
-				counts['countInputsBytes']=1
-	
-			elif packingExtendInputs==self.COINSPARK_PACKING_EXTEND_2_2_BYTES:
-				counts['firstInputBytes']=2
-				counts['countInputsBytes']=2
-
-			# Output indices
-			
-			packingExtendOutputs=(packingExtend >> self.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) & self.COINSPARK_PACKING_EXTEND_MASK
-
-			if packingExtendOutputs==self.COINSPARK_PACKING_EXTEND_BYTE:
-				counts['firstOutputBytes']=1
-	
-			elif packingExtendOutputs==self.COINSPARK_PACKING_EXTEND_2_BYTES:
-				counts['firstOutputBytes']=2
-	
-			elif packingExtendOutputs==self.COINSPARK_PACKING_EXTEND_1_1_BYTES:
-				counts['firstOutputBytes']=1
-				counts['countOutputsBytes']=1
-	
-			elif packingExtendOutputs==self.COINSPARK_PACKING_EXTEND_2_1_BYTES:
-				counts['firstOutputBytes']=2
-				counts['countOutputsBytes']=1
-	
-			elif packingExtendOutputs==self.COINSPARK_PACKING_EXTEND_2_2_BYTES:
-				counts['firstOutputBytes']=2
-				counts['countOutputsBytes']=2
+			getCounts=self.packingExtendAddByteCounts((packingExtend >> self.COINSPARK_PACKING_EXTEND_OUTPUTS_SHIFT) &
+				self.COINSPARK_PACKING_EXTEND_MASK, counts['firstOutputBytes'], counts['countOutputsBytes'], False)
+				
+			counts['firstOutputBytes']=getCounts['firstBytes']
+			counts['countOutputsBytes']=getCounts['countBytes']
 
 		# Packing for quantity
 		
@@ -1916,55 +2025,6 @@ class CoinSparkTransfer(CoinSparkBase):
 		# Return the resulting array
 	
 		return counts
-
-
-	def getPackingExtendMap(self):
-		 return [
-			('_0P', self.COINSPARK_PACKING_EXTEND_0P),
-			('_1S', self.COINSPARK_PACKING_EXTEND_1S),
-			('_ALL', self.COINSPARK_PACKING_EXTEND_ALL),
-			('_BYTE', self.COINSPARK_PACKING_EXTEND_BYTE),
-			('_2_BYTES', self.COINSPARK_PACKING_EXTEND_2_BYTES),
-			('_1_1_BYTES', self.COINSPARK_PACKING_EXTEND_1_1_BYTES),
-			('_2_1_BYTES', self.COINSPARK_PACKING_EXTEND_2_1_BYTES),
-			('_2_2_BYTES', self.COINSPARK_PACKING_EXTEND_2_2_BYTES)
-		] # in order of preference (use tuples since Python dictionaries are unordered)
-
-
-	def encodePackingExtend(self, packingOptions):
-		packingExtendMap=self.getPackingExtendMap()
-	
-		for (packingType, packingExtend) in packingExtendMap:
-			if packingOptions[packingType]:
-				return packingExtend
-			
-		return None
-
-
-	def decodePackingExtend(self, packingExtend):
-		packingExtendMap=self.getPackingExtendMap()
-	
-		for (packingType, packingExtendTest) in packingExtendMap:
-			if packingExtend==packingExtendTest:
-				return packingType
-			
-		return None
-
-
-	def writeUnsignedField(self, bytes, source):
-		return self.writeSmallEndianUnsigned(source, bytes) if (bytes>0) else '' # will return None on failure
-
-
-	def readUnsignedField(self, metadataArray, bytes, object, property):
-		if bytes>0:
-			value=self.readSmallEndianUnsigned(metadataArray[:bytes], bytes)
-			del metadataArray[:bytes]
-			if value is None:
-				return False
-			
-			setattr(object, property, value)
-	
-		return True
 
 
 # CoinSparkTransferList class for managing list of asset transfer metadata
@@ -2339,6 +2399,362 @@ class CoinSparkPaymentRef(CoinSparkBase):
 		# Return validity
 
 		return self.isValid()	
+
+
+# CoinSparkMessage class for managing message metadata
+
+class CoinSparkMessage(CoinSparkBase):
+	COINSPARK_OUTPUTS_MORE_FLAG=0x80
+	COINSPARK_OUTPUTS_RESERVED_MASK=0x60
+	COINSPARK_OUTPUTS_TYPE_MASK=0x18
+	COINSPARK_OUTPUTS_TYPE_SINGLE=0x00 # one output index (0...7)
+	COINSPARK_OUTPUTS_TYPE_FIRST=0x08 # first (0...7) outputs
+	COINSPARK_OUTPUTS_TYPE_UNUSED=0x10 # for future use
+	COINSPARK_OUTPUTS_TYPE_EXTEND=0x18 # "extend", including public/all
+	COINSPARK_OUTPUTS_VALUE_MASK=0x07
+	COINSPARK_OUTPUTS_VALUE_MAX=7
+	
+	def __init__(self):
+		self.clear()
+		
+
+	def clear(self):	
+		self.useHttps=False
+		self.serverHost=''
+		self.usePrefix=False
+		self.serverPath=''
+		self.isPublic=False
+		self.outputRanges=[]
+		self.hash=''
+		self.hashLen=0
+	
+	
+	def toString(self):	
+		hostPathMetadata=self.encodeDomainAndOrPath(self.serverHost, self.useHttps, self.serverPath, self.usePrefix)
+		urlString=self.calcServerURL()
+		
+		buffer="COINSPARK MESSAGE\n"
+		buffer+="    Server URL: %s (length %d+%d encoded %s length %d)\n" % (urlString,
+			len(self.serverHost), len(self.serverPath), CoinSparkRawStringToHex(hostPathMetadata), len(hostPathMetadata))
+		buffer+="Public message: %s\n" % ("yes" if self.isPublic else "no")
+		
+		for outputRange in self.outputRanges:
+			if outputRange.count>0:
+				if outputRange.count>1:
+					buffer+="       Outputs: %d - %d (count %d)" % (outputRange.first, outputRange.first+outputRange.count-1, outputRange.count)
+				else:
+					buffer+="        Output: %d" % outputRange.first
+			else:
+				buffer+="       Outputs: none"
+	
+			buffer+=" (small endian hex: first %s count %s)\n" % (self.unsignedToSmallEndianHex(outputRange.first, 2),
+				self.unsignedToSmallEndianHex(outputRange.count, 2))
+		
+		buffer+="  Message hash: %s (length %d)\n" % (CoinSparkRawStringToHex(self.hash[:self.hashLen]), self.hashLen)
+		buffer+="END COINSPARK MESSAGE\n\n"
+		
+		return buffer
+	
+	
+	def isValid(self):
+		if not (
+			self.isBoolean(self.useHttps) and
+			self.isString(self.serverHost) and
+			self.isBoolean(self.usePrefix) and
+			self.isString(self.serverPath) and
+			self.isBoolean(self.isPublic) and
+			isinstance(self.outputRanges, list) and
+			self.isString(self.hash) and
+			self.isInteger(self.hashLen)
+		):
+			return False
+		
+		if len(self.serverHost)>COINSPARK_MESSAGE_SERVER_HOST_MAX_LEN:
+			return False
+
+		if len(self.serverPath)>COINSPARK_MESSAGE_SERVER_PATH_MAX_LEN:
+			return False
+			
+		if len(self.hash)<self.hashLen: # check we have at least as much data as specified by self.hashLen
+			return False 
+
+		if (self.hashLen<COINSPARK_MESSAGE_HASH_MIN_LEN) or (self.hashLen>COINSPARK_MESSAGE_HASH_MAX_LEN):
+			return False
+
+		if (not self.isPublic) and (len(self.outputRanges)==0): # public or aimed at some outputs at least
+			return False
+
+		if len(self.outputRanges)>COINSPARK_MESSAGE_MAX_IO_RANGES:
+			return False
+
+		for outputRange in self.outputRanges:
+			if not outputRange.isValid():
+				return False
+
+		return True
+	
+	
+	def match(self, otherMessage, strict):	
+		hashCompareLen=min(self.hashLen, otherMessage.hashLen, COINSPARK_MESSAGE_HASH_MAX_LEN)
+
+		if strict:
+			thisRanges=self.outputRanges
+			otherRanges=otherMessage.outputRanges
+	
+		else:
+			thisRanges=self.normalizeIORanges(self.outputRanges)
+			otherRanges=self.normalizeIORanges(otherMessage.outputRanges)
+		
+		if len(thisRanges) != len(otherRanges):
+			return False
+			
+		for index in range(len(thisRanges)):
+			if not thisRanges[index].match(otherRanges[index]):
+				return False
+		
+		return (
+			(self.useHttps==otherMessage.useHttps) and
+			(self.serverHost.lower()==otherMessage.serverHost.lower()) and
+			(self.usePrefix==otherMessage.usePrefix) and
+			(self.serverPath.lower()==otherMessage.serverPath.lower()) and
+			(self.isPublic==otherMessage.isPublic) and
+			(self.hash[:hashCompareLen].lower()==otherMessage.hash[:hashCompareLen].lower())
+		)
+	
+	
+	def encode(self, countOutputs, metadataMaxLen):
+		if not self.isValid():
+			return None;
+
+		# 4-character identifier
+	
+		metadata=COINSPARK_METADATA_IDENTIFIER+COINSPARK_MESSAGE_PREFIX
+
+		# Server host and path
+		
+		written=self.encodeDomainAndOrPath(self.serverHost, self.useHttps, self.serverPath, self.usePrefix)
+		if written is None:
+			return None
+
+		metadata+=written
+
+		# Output ranges
+
+		if self.isPublic: # add public indicator first
+			packing=((self.COINSPARK_OUTPUTS_MORE_FLAG if len(self.outputRanges)>0 else 0) |
+				self.COINSPARK_OUTPUTS_TYPE_EXTEND | self.COINSPARK_PACKING_EXTEND_PUBLIC)
+			metadata+=chr(packing)
+		
+		for index in range(len(self.outputRanges)): # other output ranges
+			outputRange=self.outputRanges[index]
+			
+			packingResult=self.getOutputRangePacking(outputRange, countOutputs)
+			if packingResult is None:
+				return None
+	
+			# The packing byte
+			
+			packing=packingResult['packing']
+	
+			if (index+1)<len(self.outputRanges):
+				packing|=self.COINSPARK_OUTPUTS_MORE_FLAG
+
+			metadata+=chr(packing)
+	
+			# The index of the first output, if necessary
+	
+			written=self.writeUnsignedField(packingResult['firstBytes'], outputRange.first)
+			if written is None:
+				return None
+			
+			metadata+=written
+	
+			# The number of outputs, if necessary
+			
+			written=self.writeUnsignedField(packingResult['countBytes'], outputRange.count)
+			if written is None:
+				return None
+			
+			metadata+=written
+
+		# Message hash
+	
+		metadata+=self.hash[:self.hashLen]
+
+		# Check the total length is within the specified limit
+	
+		if len(metadata)>metadataMaxLen:
+			return None
+			
+		# Return what we created
+	
+		return metadata
+	
+	
+	def decode(self, metadata, countOutputs):
+		metadata=CoinSparkLocateMetadataRange(metadata, COINSPARK_MESSAGE_PREFIX)
+		if metadata is None:
+			return False
+			
+		# Server host and path
+		
+		decodedHostPath=self.decodeDomainAndOrPath(metadata, True, True)
+		if decodedHostPath is None:
+			return False
+		
+		metadata=metadata[decodedHostPath['decodedChars']:]
+		self.useHttps=decodedHostPath['useHttps']
+		self.serverHost=decodedHostPath['domainName']
+		self.usePrefix=decodedHostPath['usePrefix']
+		self.serverPath=decodedHostPath['pagePath']
+
+		# Output ranges
+
+		self.isPublic=False
+		self.outputRanges=[]
+		readAnotherRange=True # since Python has no do...while construct
+
+		while readAnotherRange: 
+			packing=self.readSmallEndianUnsigned(metadata, 1) # Read the next packing byte and check reserved bits are zero
+			metadata=metadata[1:]
+			if packing is None:
+				return False
+ 
+			if packing & self.COINSPARK_OUTPUTS_RESERVED_MASK:
+				return False
+	
+			readAnotherRange=packing & self.COINSPARK_OUTPUTS_MORE_FLAG
+			packingType=packing & self.COINSPARK_OUTPUTS_TYPE_MASK
+			packingValue=packing & self.COINSPARK_OUTPUTS_VALUE_MASK
+	
+			if (packingType==self.COINSPARK_OUTPUTS_TYPE_EXTEND) and (packingValue==self.COINSPARK_PACKING_EXTEND_PUBLIC):
+				self.isPublic=True # special case for public messages
+	
+			else: # Create a new output range		
+				if len(self.outputRanges)>=COINSPARK_MESSAGE_MAX_IO_RANGES: # too many output ranges
+					return False
+				
+				firstBytes=0
+				countBytes=0
+		
+				# Decode packing byte
+		
+				if packingType==self.COINSPARK_OUTPUTS_TYPE_SINGLE: # inline single input
+					outputRange=CoinSparkIORange()
+					outputRange.first=packingValue
+					outputRange.count=1
+	   
+				elif packingType==self.COINSPARK_OUTPUTS_TYPE_FIRST: # inline first few outputs
+					outputRange=CoinSparkIORange()
+					outputRange.first=0
+					outputRange.count=packingValue
+			
+				elif packingType==self.COINSPARK_OUTPUTS_TYPE_EXTEND: # we'll be taking additional bytes
+					extendPackingType=self.decodePackingExtend(packingValue, True)
+					if extendPackingType is None:
+						return False
+					
+					outputRange=self.packingTypeToValues(extendPackingType, None, countOutputs)
+					
+					getCounts=self.packingExtendAddByteCounts(packingValue, firstBytes, countBytes, True)
+					firstBytes=getCounts['firstBytes']
+					countBytes=getCounts['countBytes']
+			
+				else:
+					return False # will be self.COINSPARK_OUTPUTS_TYPE_UNUSED
+		
+				# The index of the first output and number of outputs, if necessary
+				
+				metadataArray=[metadataChar for metadataChar in metadata] # split into array of characters for next bit
+				
+				if not self.shiftReadUnsignedField(metadataArray, firstBytes, outputRange, 'first'):
+					return False
+
+				if not self.shiftReadUnsignedField(metadataArray, countBytes, outputRange, 'count'):
+					return False
+					
+				metadata="".join(metadataArray) # convert any remaining characters back into the string
+				
+				# Add on the new output range
+			
+				self.outputRanges.append(outputRange)
+			
+		# Message hash
+	
+		self.hashLen=min(len(metadata), COINSPARK_MESSAGE_HASH_MAX_LEN)
+		self.hash=metadata[:self.hashLen] # insufficient length will be caught by isValid()
+
+		# Return validity
+
+		return self.isValid()
+	
+	
+	def hasOutput(self, outputIndex):
+		for outputRange in self.outputRanges:
+			if (outputIndex>=outputRange.first) and (outputIndex<(outputRange.first+outputRange.count)):
+				return True
+
+		return False
+	
+	
+	def calcHashLen(self, countOutputs, metadataMaxLen):
+		hashLen=metadataMaxLen-COINSPARK_METADATA_IDENTIFIER_LEN-1
+
+		hostPathLen=len(self.serverPath)+1
+
+		if self.readIPv4Address(self.serverHost):
+			hashLen-=5 # packing and IP octets
+		else:
+			hashLen-=1 # packing
+			hostPathLen+=len(self.shrinkLowerDomainName(self.serverHost)['domainName'])+1
+
+		hashLen-=2*int((hostPathLen+2)/3) # uses integer arithmetic
+
+		if self.isPublic:
+			hashLen-=1
+		
+		for outputRange in self.outputRanges:
+			packingResult=self.getOutputRangePacking(outputRange, countOutputs)
+			if packingResult is not None:
+				hashLen-=(1+packingResult['firstBytes']+packingResult['countBytes'])
+
+		return min(max(hashLen, 0), COINSPARK_MESSAGE_HASH_MAX_LEN)
+	
+	
+	def calcServerURL(self):
+		return (
+			('https' if self.useHttps else 'http')+
+			'://'+self.serverHost+'/'+
+			('coinspark/' if self.usePrefix else '')+
+			self.serverPath+
+			('/' if len(self.serverPath) else '')
+		).lower()
+	
+	
+	def getOutputRangePacking(self, outputRange, countOutputs):
+		packingOptions=self.getPackingOptions(None, outputRange, countOutputs, True)
+
+		firstBytes=0
+		countBytes=0
+
+		if packingOptions['_1_0_BYTE'] and (outputRange.first<=self.COINSPARK_OUTPUTS_VALUE_MAX): # inline single output
+			packing=self.COINSPARK_OUTPUTS_TYPE_SINGLE | (outputRange.first & self.COINSPARK_OUTPUTS_VALUE_MASK)
+
+		elif packingOptions['_0_1_BYTE'] and (outputRange.count<=self.COINSPARK_OUTPUTS_VALUE_MAX): # inline first few outputs
+			packing=self.COINSPARK_OUTPUTS_TYPE_FIRST | (outputRange.count & self.COINSPARK_OUTPUTS_VALUE_MASK)
+
+		else: # we'll be taking additional bytes
+			packingExtend=self.encodePackingExtend(packingOptions)
+			if packingExtend is None:
+				return None
+	
+			packingResult=self.packingExtendAddByteCounts(packingExtend, firstBytes, countBytes, True)
+			firstBytes=packingResult['firstBytes']
+			countBytes=packingResult['countBytes']
+	
+			packing=self.COINSPARK_OUTPUTS_TYPE_EXTEND | (packingExtend & self.COINSPARK_OUTPUTS_VALUE_MASK)
+
+		return {'packing':packing, 'firstBytes':firstBytes, 'countBytes':countBytes}
 
 
 # Class used internally for input or output ranges

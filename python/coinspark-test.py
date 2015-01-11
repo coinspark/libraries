@@ -53,6 +53,9 @@ def ProcessInputContents(inputSource):
 	elif header=='CoinSpark Transfer Tests Input':
 		ProcessTransferTests(inputSource)
 		
+	elif header=='CoinSpark MessageHash Tests Input':
+		ProcessMessageHashTests(inputSource)
+		
 		
 def ProcessAddressTests(inputSource):
 	print("CoinSpark Address Tests Output\n")
@@ -127,6 +130,9 @@ def ProcessScriptTests(inputSource):
 		transfers=CoinSparkTransferList()
 		hasTransfers=transfers.decode(metadata, countInputs, countOutputs)
 		
+		message=CoinSparkMessage()
+		hasMessage=message.decode(metadata, countOutputs)
+		
 		# Output the toString()s
 		
 		if hasGenesis:
@@ -138,13 +144,16 @@ def ProcessScriptTests(inputSource):
 		if hasTransfers:
 			sys.stdout.write(transfers.toString())
 			
+		if hasMessage:
+			sys.stdout.write(message.toString())
+			
 		# Re-encode
 		
 		testMetadata=''
 		testMetadataMaxLen=len(metadata)
 		nextMetadataMaxLen=testMetadataMaxLen
 		
-		encodeOrder=['genesis', 'paymentRef', 'transfers']
+		encodeOrder=['genesis', 'paymentRef', 'transfers', 'message']
 		
 		for encodeField in encodeOrder:
 			triedNextMetadata=False
@@ -162,6 +171,11 @@ def ProcessScriptTests(inputSource):
 			elif encodeField=='transfers':
 				if hasTransfers:
 					nextMetadata=transfers.encode(countInputs, countOutputs, nextMetadataMaxLen)
+					triedNextMetadata=True
+					
+			elif encodeField=='message':
+				if hasMessage:
+					nextMetadata=message.encode(countOutputs, nextMetadataMaxLen)
 					triedNextMetadata=True
 					
 			if triedNextMetadata:
@@ -211,6 +225,18 @@ def ProcessScriptTests(inputSource):
 				
 			if not transfers.match(transfers, False):
 				sys.exit("Failed to leniently match transfers to itself!")
+				
+		if hasMessage:
+			if not message.match(message, True):
+				sys.exit("Failed to strictly match message to itself!")
+				
+			if not message.match(message, False):
+				sys.exit("Failed to leniently match message to itself!")
+				
+			messageEncode=message.encode(countOutputs, len(metadata)) # encode on its own to check calcHashLen()
+			
+			if message.calcHashLen(countOutputs, len(messageEncode))!=message.hashLen:
+				sys.exit("Failed to calculate matching message hash length!")
 				
 		# Compare to the original
 		
@@ -336,6 +362,36 @@ def ProcessTransferTests(inputSource):
 			if float(inputBalance)!=testNetBalance:
 				sys.exit("Net to gross to net mismatch: %.0f -> %.0f -> %.0f!" % (float(inputBalance), testGrossBalance, testNetBalance))
 		
+
+def ProcessMessageHashTests(inputSource):
+	print("CoinSpark MessageHash Tests Output\n")
+	
+	while True:
+		inputLines=GetNextInputLines(inputSource, 2)
+		if inputLines is None:
+			break
+			
+		salt, countParts = inputLines
+
+		salt=salt.encode('utf-8')
+		countParts=int(countParts)
+		
+		inputLines=GetNextInputLines(inputSource, 3*countParts+1)
+		if inputLines is None:
+			break
+		
+		messageParts=[]
+		while ((len(messageParts)<countParts) and (len(inputLines)>0)):
+			messageParts.append({
+				'mimeType': inputLines.pop(0),
+				'fileName': inputLines.pop(0),
+				'content': inputLines.pop(0).encode('utf-8')
+			})
+			
+		hash=CoinSparkCalcMessageHash(salt, messageParts)
+		
+		print(binascii.hexlify(hash).upper().decode('utf-8'))
+
 
 # Main entry point for code
 	
