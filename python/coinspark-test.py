@@ -407,4 +407,3 @@ if os.path.isfile(inputFileName):
 
 else:
 	sys.exit("The CoinSpark test input file was wrong\n")
-	

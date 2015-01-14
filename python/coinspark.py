@@ -200,7 +200,12 @@ def CoinSparkMetadataToScript(metadata, toHexScript):
 		scriptPubKey=chr(0x6a)+chr(len(metadata))+metadata
 		if toHexScript:
 			scriptPubKey=CoinSparkRawStringToHex(scriptPubKey).upper()
-		
+		else:
+			try:
+				scriptPubKey=bytearray(map(ord, scriptPubKey)) # return bytearray
+			except NameError:
+				pass # for Python 2.5 or earlier, just return the string
+			
 		return scriptPubKey
 		
 	return None
@@ -2784,13 +2789,15 @@ class CoinSparkIORange(CoinSparkBase):
 		return (self.first==otherInOutRange.first) and (self.count==otherInOutRange.count)
 
 
-# Other function used internally
+# Other functions used internally
 
 def CoinSparkGetRawScript(scriptPubKey, scriptIsHex):
 	if scriptIsHex:
 		return CoinSparkHexToRawString(scriptPubKey)
-	else:
+	elif isinstance(scriptPubKey, str):
 		return scriptPubKey
+	else:
+		return "".join(map(chr, scriptPubKey)) # for bytearrays, bytes, array of 0..255
 
 
 def CoinSparkLocateMetadataRange(metadata, desiredPrefix):

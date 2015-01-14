@@ -148,6 +148,9 @@ THE SOFTWARE.
 CHANGELOG
 ---------
 
+v2.0.3 - 14 January 2015
+- Support bytearray for scripts in Python script<->metadata functions
+
 v2.0.2 - 11 January 2015
 * Added Python (2.x, 3.x) support for messaging
 
