@@ -270,7 +270,7 @@ public class CoinSparkMessage extends CoinSparkBase{
         String encodedWebPage="";
                 
         CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(serverHost, serverPath, useHttps, usePrefix);
-        if(assetWebPage.encode(assetWebPageBuffer))
+        if(assetWebPage.encode(assetWebPageBuffer,true))
         {
             encodedWebPage=assetWebPageBuffer.toHex();
         }
@@ -284,7 +284,7 @@ public class CoinSparkMessage extends CoinSparkBase{
                 serverHost.length(),
                 serverPath.length(),
                 encodedWebPage,
-                assetWebPage.encodedLen()));
+                assetWebPage.encodedLen(true)));
         sb.append(String.format("Public message: %s\n", isPublic ? "yes" : "no"));
 
         for (int index=0; index < countOutputRanges; index++)
@@ -570,7 +570,7 @@ public class CoinSparkMessage extends CoinSparkBase{
         int len = metadataMaxLen-COINSPARK_METADATA_IDENTIFIER.length()-1;
 	
         CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(serverHost, serverPath, useHttps, usePrefix);
-        len-=assetWebPage.encodedLen();
+        len-=assetWebPage.encodedLen(true);
 	
 	if (isPublic)
             len--;
@@ -685,7 +685,7 @@ public class CoinSparkMessage extends CoinSparkBase{
             //  Server host and path
 
             CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(serverHost, serverPath, useHttps, usePrefix);
-            if (!assetWebPage.encode(buffer))
+            if (!assetWebPage.encode(buffer,true))
                 throw new CoinSparkExceptions.CannotEncode("cannot write domain name/path");
 	
             //  Output ranges
@@ -746,7 +746,7 @@ public class CoinSparkMessage extends CoinSparkBase{
         {            
             //  Server host and path
             CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(serverHost, serverPath, useHttps, usePrefix);
-            if (!assetWebPage.decode(buffer))
+            if (!assetWebPage.decode(buffer,true))
                 throw new CoinSparkExceptions.CannotDecode("cannot decode server host");
             
             serverHost=assetWebPage.domainName;

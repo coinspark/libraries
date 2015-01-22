@@ -184,10 +184,12 @@ public class CoinSparkDomainPath extends CoinSparkBase{
     
     private static final int COINSPARK_DOMAIN_PACKING_PREFIX_MASK     = 0xC0;
     private static final int COINSPARK_DOMAIN_PACKING_PREFIX_SHIFT    = 6;
-    private static final int COINSPARK_DOMAIN_PACKING_SUFFIX_MASK     = 0x3F;
-    private static final int COINSPARK_DOMAIN_PACKING_SUFFIX_MAX      = 62;
+    private static final byte COINSPARK_DOMAIN_PACKING_SUFFIX_MASK     = 0x3F;
+    private static final int COINSPARK_DOMAIN_PACKING_SUFFIX_MAX      = 61;
+    private static final int COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH  = 62; // messages only
     private static final int COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4     = 63;
     private static final int COINSPARK_DOMAIN_PACKING_IPv4_HTTPS      = 0x40;
+    private static final int COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX   = 0x80;
     private static final int COINSPARK_DOMAIN_PATH_ENCODE_BASE        = 40;
     private static final int COINSPARK_DOMAIN_PATH_FALSE_MARKER       = 38;
     private static final int COINSPARK_DOMAIN_PATH_TRUE_MARKER        = 39;
@@ -472,7 +474,7 @@ public class CoinSparkDomainPath extends CoinSparkBase{
     }
     
     
-    protected int encodedLen()
+    protected int encodedLen(boolean forMessages)
     {
         int encodedLen=0;                
         int decodedLen=path.length()+1;
@@ -480,6 +482,13 @@ public class CoinSparkDomainPath extends CoinSparkBase{
         if(octetsIPV4() != null)
         {
             encodedLen+=5;
+            if(forMessages)
+            {
+                if(decodedLen==1)// will skip server path in this case
+                {
+                    decodedLen=0;
+                }
+            }
         }
         else
         {
@@ -488,14 +497,19 @@ public class CoinSparkDomainPath extends CoinSparkBase{
             decodedLen+=domainNameShort.length()+1;            
         }
         
-        encodedLen+=2*((decodedLen-1)/3+1);
+        if(decodedLen>0)
+        {
+            encodedLen+=2*((decodedLen-1)/3+1);
+        }
         
         return encodedLen;
     }
     
-    protected boolean encode(CoinSparkBuffer buffer)
+    protected boolean encode(CoinSparkBuffer buffer,boolean forMessages)
     {
         int [] octets;
+        int parts=0;
+        boolean takePathPart=true;
         String stringToPack="";
         
         try
@@ -503,6 +517,13 @@ public class CoinSparkDomainPath extends CoinSparkBase{
             if( (octets=octetsIPV4()) != null)
             {
                 byte temp = COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4;
+                if(forMessages  && (path.length() == 0))
+                {
+                    temp = COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH;
+                    temp += (usePrefix ? COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX : (byte)0);
+                    takePathPart=false;
+                }
+                
                 temp += (useHttps ? COINSPARK_DOMAIN_PACKING_IPv4_HTTPS : (byte)0);
                 
                 buffer.writeByte(temp);
@@ -524,13 +545,21 @@ public class CoinSparkDomainPath extends CoinSparkBase{
 
                 stringToPack+=domainNameShort + 
                         (useHttps ? domainNameChars.charAt(COINSPARK_DOMAIN_PATH_TRUE_MARKER) : domainNameChars.charAt(COINSPARK_DOMAIN_PATH_FALSE_MARKER));
+                parts++;
             }
-            stringToPack+=path.toLowerCase() + 
-                    (usePrefix ? domainNameChars.charAt(COINSPARK_DOMAIN_PATH_TRUE_MARKER) : domainNameChars.charAt(COINSPARK_DOMAIN_PATH_FALSE_MARKER));
             
-            if(!packString(buffer, stringToPack))
+            if(takePathPart)
             {
-                throw new CoinSparkExceptions.CannotEncode("Cannot write domain and path");                    
+                stringToPack+=path.toLowerCase() + 
+                        (usePrefix ? domainNameChars.charAt(COINSPARK_DOMAIN_PATH_TRUE_MARKER) : domainNameChars.charAt(COINSPARK_DOMAIN_PATH_FALSE_MARKER));
+                parts++;
+            }           
+            if(parts > 0)
+            {
+                if(!packString(buffer, stringToPack))
+                {
+                    throw new CoinSparkExceptions.CannotEncode("Cannot write domain and path");                    
+                }
             }
         }
         catch (Exception cne)
@@ -542,9 +571,9 @@ public class CoinSparkDomainPath extends CoinSparkBase{
     }
             
     
-    protected boolean decode(CoinSparkBuffer buffer)
+    protected boolean decode(CoinSparkBuffer buffer,boolean forMessages)
     {
-        byte packing;
+        byte packing,packingSuffix;
         int[] octets = new int[4];
         byte result[] = new byte[1];
         int parts=0;
@@ -559,7 +588,9 @@ public class CoinSparkDomainPath extends CoinSparkBase{
             else
                 throw new CoinSparkExceptions.CannotDecode("Buffer is empty");
 
-            if ((packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK)==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4)  // check for IPv4 address
+            packingSuffix=(byte)(packing & COINSPARK_DOMAIN_PACKING_SUFFIX_MASK);
+            if ((packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4) ||
+                (forMessages && (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH)))// check for IPv4 address
             {
                 domainNamePacking=-1;
                 useHttps = ((packing & COINSPARK_DOMAIN_PACKING_IPv4_HTTPS) != 0);
@@ -580,6 +611,13 @@ public class CoinSparkDomainPath extends CoinSparkBase{
 
                 if (domainName.length() >= 256) // allow for null terminator
                     throw new CoinSparkExceptions.CannotDecode("Domain name too long");
+                
+                if(forMessages && (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH))
+                {
+                    path="";
+                    usePrefix = ((packing & COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX) != 0);
+                    parts--;
+                }
             }
             else
             {
@@ -600,32 +638,35 @@ public class CoinSparkDomainPath extends CoinSparkBase{
             byte charFalse=(byte)domainNameChars.charAt(COINSPARK_DOMAIN_PATH_FALSE_MARKER);
             
             int start=0;
-            parts=1;
-            for(int i=0;i<unpacked.length;i++)
+            if(parts>0)
             {
-                if((unpacked[i] == charTrue) || (unpacked[i] == charFalse))
+                parts=1;
+                for(int i=0;i<unpacked.length;i++)
                 {
-                    String decodedString="";
-                    boolean decodeFlag=(unpacked[i] == charTrue);
-                    if(i>start)
+                    if((unpacked[i] == charTrue) || (unpacked[i] == charFalse))
                     {
-                        decodedString=new String(Arrays.copyOfRange(unpacked, start, i), "UTF-8");
+                        String decodedString="";
+                        boolean decodeFlag=(unpacked[i] == charTrue);
+                        if(i>start)
+                        {
+                            decodedString=new String(Arrays.copyOfRange(unpacked, start, i), "UTF-8");
+                        }
+                        if(parts == pathPart)
+                        {
+                            path=decodedString;
+                            usePrefix=decodeFlag;
+                        }
+                        else
+                        {
+                            domainNameShort=decodedString;
+                            useHttps=decodeFlag;
+                            expand();                        
+                        }
+                        start=i+1;
+                        parts++;
                     }
-                    if(parts == pathPart)
-                    {
-                        path=decodedString;
-                        usePrefix=decodeFlag;
-                    }
-                    else
-                    {
-                        domainNameShort=decodedString;
-                        useHttps=decodeFlag;
-                        expand();                        
-                    }
-                    start=i+1;
-                    parts++;
-                }
-            }            
+                }            
+            }
         }
         catch (CoinSparkExceptions.CannotDecode | UnsupportedEncodingException ex)
         {

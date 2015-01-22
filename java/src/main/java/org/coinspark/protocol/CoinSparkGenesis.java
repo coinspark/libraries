@@ -305,7 +305,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
         String encodedWebPage="";
         
         CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
-        if(assetWebPage.encode(assetWebPageBuffer))
+        if(assetWebPage.encode(assetWebPageBuffer,false))
         {
             encodedWebPage=assetWebPageBuffer.toHex();
         }
@@ -328,7 +328,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
                         assetWebPage.usePrefix ? "coinspark/" : "",
                         (assetWebPage.path.length()>0) ? assetWebPage.path : "[spent-txid]",
                         assetWebPage.domainName.length(),assetWebPage.path.length(),
-                        encodedWebPage,assetWebPage.encodedLen()))
+                        encodedWebPage,assetWebPage.encodedLen(false)))
                 .append(String.format("          Asset hash: "))
                 .append(byteToHex(Arrays.copyOf(assetHash, assetHashLen)))
                 .append(String.format(" (length %d)\n", this.assetHashLen))
@@ -550,7 +550,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
 
         
         CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
-        HashLen-=assetWebPage.encodedLen();
+        HashLen-=assetWebPage.encodedLen(false);
 
         if (HashLen > COINSPARK_GENESIS_HASH_MAX_LEN)
             HashLen = COINSPARK_GENESIS_HASH_MAX_LEN;
@@ -899,7 +899,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
 
             //  Asset web page
             CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
-            if (!assetWebPage.encode(buffer))
+            if (!assetWebPage.encode(buffer,false))
                 throw new CoinSparkExceptions.CannotEncode("cannot write domain name/path");
 
             //  Asset hash
@@ -1001,7 +1001,7 @@ public class CoinSparkGenesis extends CoinSparkBase{
             //  Domain name
             
             CoinSparkDomainPath assetWebPage=new CoinSparkDomainPath(domainName, pagePath, useHttps, usePrefix);
-            if (!assetWebPage.decode(buffer))
+            if (!assetWebPage.decode(buffer,false))
                 throw new CoinSparkExceptions.CannotDecode("cannot decode domain name");
 
             domainName=assetWebPage.domainName;
