@@ -59,9 +59,11 @@
 #define COINSPARK_DOMAIN_PACKING_PREFIX_MASK 0xC0
 #define COINSPARK_DOMAIN_PACKING_PREFIX_SHIFT 6
 #define COINSPARK_DOMAIN_PACKING_SUFFIX_MASK 0x3F
-#define COINSPARK_DOMAIN_PACKING_SUFFIX_MAX 62
+#define COINSPARK_DOMAIN_PACKING_SUFFIX_MAX 61
+#define COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH 62 // messages only
 #define COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4 63
 #define COINSPARK_DOMAIN_PACKING_IPv4_HTTPS 0x40
+#define COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX 0x80
 
 #define COINSPARK_DOMAIN_PATH_ENCODE_BASE 40
 #define COINSPARK_DOMAIN_PATH_FALSE_END_CHAR '<'
@@ -1031,7 +1033,7 @@ static size_t DecodeDomainPathTriplets(const char* _metadataPtr, const char* met
 }
 
 static size_t EncodeDomainAndOrPath(const char* domainName, bool useHttps, const char* pagePath, bool usePrefix,
-                                      char* _metadataPtr, const char* metadataEnd)
+                                      char* _metadataPtr, const char* metadataEnd, bool forMessages)
 {
     size_t encodeStringLen, pagePathLen, encodeLen;
     char *metadataPtr, packing, encodeString[256];
@@ -1046,7 +1048,21 @@ static size_t EncodeDomainAndOrPath(const char* domainName, bool useHttps, const
         if (ReadIPv4Address(domainName, octets)) { // special space-saving encoding for IPv4 addresses
             
             if ((metadataPtr+5)<=metadataEnd) {
-                *metadataPtr++=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4+(useHttps ? COINSPARK_DOMAIN_PACKING_IPv4_HTTPS : 0);
+
+                if (pagePath && forMessages && (*pagePath==0)) {
+                    packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH;
+                    if (usePrefix)
+                        packing|=COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX;
+
+                    pagePath=NULL; // skip encoding the empty page path
+
+                } else
+                    packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4;
+                
+                if (useHttps)
+                    packing|=COINSPARK_DOMAIN_PACKING_IPv4_HTTPS;
+
+                *metadataPtr++=packing;
                 
                 ((u_int8_t*)metadataPtr)[0]=octets[0];
                 ((u_int8_t*)metadataPtr)[1]=octets[1];
@@ -1101,12 +1117,12 @@ static size_t EncodeDomainAndOrPath(const char* domainName, bool useHttps, const
     return 0;
 }
 
-static size_t DecodeDomainAndOrPath(const char* _metadataPtr, const char* metadataEnd, char* domainName, size_t domainNameMaxLen, bool* useHttps, char* pagePath, size_t pagePathMaxLen, bool* usePrefix)
+static size_t DecodeDomainAndOrPath(const char* _metadataPtr, const char* metadataEnd, char* domainName, size_t domainNameMaxLen, bool* useHttps, char* pagePath, size_t pagePathMaxLen, bool* usePrefix, bool forMessages)
 {
     const char *metadataPtr;
     size_t decodedLen, ipAddressLen, metadataLen, decodePathLen, prevDecodedLen;
     bool isIpAddress;
-    char packing, ipAddress[16], decodeString[256], decodeChar;
+    char packing, packingSuffix, ipAddress[16], decodeString[256], decodeChar;
     u_int8_t octets[4];
     int metadataParts;
 
@@ -1126,7 +1142,9 @@ static size_t DecodeDomainAndOrPath(const char* _metadataPtr, const char* metada
 
     //  Extract IP address if present
         
-        isIpAddress=((packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK)==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4);
+        packingSuffix=packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK;
+        isIpAddress=(packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4) ||
+            (forMessages && (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH));
         
         if (isIpAddress) {
             *useHttps=(packing&COINSPARK_DOMAIN_PACKING_IPv4_HTTPS) ? TRUE : FALSE;
@@ -1149,6 +1167,12 @@ static size_t DecodeDomainAndOrPath(const char* _metadataPtr, const char* metada
                 goto cannotDecodeDomainAndPath;
             
             strcpy(domainName, ipAddress);
+            
+            if (pagePath && forMessages && (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH)) {
+                *pagePath=0;
+                *usePrefix=(packing&COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX) ? TRUE : FALSE;
+                pagePath=NULL; // skip decoding the empty page path
+            }
         
         } else
             metadataParts++;
@@ -1694,7 +1718,7 @@ bool CoinSparkGenesisToString(const CoinSparkGenesis *genesis, char* string, con
     chargeFlat=CoinSparkGenesisGetChargeFlat(genesis);
     chargeFlatEncoded=genesis->chargeFlatExponent*COINSPARK_GENESIS_CHARGE_FLAT_EXPONENT_MULTIPLE+genesis->chargeFlatMantissa;
     domainPathEncodeLen=EncodeDomainAndOrPath(genesis->domainName, genesis->useHttps, genesis->pagePath, genesis->usePrefix,
-                                            domainPathMetadata, domainPathMetadata+sizeof(domainPathMetadata));
+                                            domainPathMetadata, domainPathMetadata+sizeof(domainPathMetadata), FALSE);
     
     bufferPtr+=sprintf(bufferPtr, "COINSPARK GENESIS\n");
     bufferPtr+=sprintf(bufferPtr, "   Quantity mantissa: %d\n", genesis->qtyMantissa);
@@ -1939,7 +1963,7 @@ size_t CoinSparkGenesisEncode(const CoinSparkGenesis *genesis, char* metadata, c
     
 //  Domain name and page path
     
-    encodeLen=EncodeDomainAndOrPath(genesis->domainName, genesis->useHttps, genesis->pagePath, genesis->usePrefix, metadataPtr, metadataEnd);
+    encodeLen=EncodeDomainAndOrPath(genesis->domainName, genesis->useHttps, genesis->pagePath, genesis->usePrefix, metadataPtr, metadataEnd, FALSE);
     if (!encodeLen)
         goto cannotEncodeGenesis;
     
@@ -2017,7 +2041,7 @@ bool CoinSparkGenesisDecode(CoinSparkGenesis* genesis, const char* metadata, con
 //  Domain name and page path
     
     decodeLen=DecodeDomainAndOrPath(metadataPtr, metadataEnd, genesis->domainName, sizeof(genesis->domainName),
-                                    &genesis->useHttps, genesis->pagePath, sizeof(genesis->pagePath), &genesis->usePrefix);
+                                    &genesis->useHttps, genesis->pagePath, sizeof(genesis->pagePath), &genesis->usePrefix, FALSE);
     
     if (!decodeLen)
         goto cannotDecodeGenesis;
@@ -3037,7 +3061,7 @@ bool CoinSparkMessageToString(const CoinSparkMessage* message, char* string, con
     bufferPtr=buffer;
     
     hostPathEncodeLen=EncodeDomainAndOrPath(message->serverHost, message->useHttps, message->serverPath, message->usePrefix,
-                                            hostPathMetadata, hostPathMetadata+sizeof(hostPathMetadata));
+                                            hostPathMetadata, hostPathMetadata+sizeof(hostPathMetadata), TRUE);
     CoinSparkMessageCalcServerURL(message, urlString, sizeof(urlString));
     
     bufferPtr+=sprintf(bufferPtr, "COINSPARK MESSAGE\n");
@@ -3183,7 +3207,7 @@ size_t CoinSparkMessageEncode(const CoinSparkMessage* message, const int countOu
 
 //  Server host and path
     
-    encodeLen=EncodeDomainAndOrPath(message->serverHost, message->useHttps, message->serverPath, message->usePrefix, metadataPtr, metadataEnd);
+    encodeLen=EncodeDomainAndOrPath(message->serverHost, message->useHttps, message->serverPath, message->usePrefix, metadataPtr, metadataEnd, TRUE);
     if (!encodeLen)
         goto cannotEncodeMessage;
     
@@ -3272,7 +3296,7 @@ bool CoinSparkMessageDecode(CoinSparkMessage* message, const int countOutputs, c
 //  Server host and path
     
     decodeLen=DecodeDomainAndOrPath(metadataPtr, metadataEnd, message->serverHost, sizeof(message->serverHost),
-                                    &message->useHttps, message->serverPath, sizeof(message->serverPath), &message->usePrefix);
+                                    &message->useHttps, message->serverPath, sizeof(message->serverPath), &message->usePrefix, TRUE);
     
     if (!decodeLen)
         goto cannotDecodeMessage;
@@ -3399,9 +3423,11 @@ size_t CoinSparkMessageCalcHashLen(const CoinSparkMessage *message, int countOut
     
     hostPathLen=strlen(message->serverPath)+1;
     
-    if (ReadIPv4Address(message->serverHost, octets))
+    if (ReadIPv4Address(message->serverHost, octets)) {
         hashLen-=5; // packing and IP octets
-    else {
+        if (hostPathLen==1)
+            hostPathLen=0; // will skip server path in this case
+    } else {
         hashLen-=1; // packing
         hostPathLen+=ShrinkLowerDomainName(message->serverHost, strlen(message->serverHost), hostName, sizeof(hostName), &packing)+1;
     }

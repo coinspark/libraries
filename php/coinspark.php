@@ -91,9 +91,11 @@
 	define('COINSPARK_DOMAIN_PACKING_PREFIX_MASK', 0xC0);
 	define('COINSPARK_DOMAIN_PACKING_PREFIX_SHIFT', 6);
 	define('COINSPARK_DOMAIN_PACKING_SUFFIX_MASK', 0x3F);
-	define('COINSPARK_DOMAIN_PACKING_SUFFIX_MAX', 62);
+	define('COINSPARK_DOMAIN_PACKING_SUFFIX_MAX', 61);
+	define('COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH', 62); // messages only
 	define('COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4', 63);
 	define('COINSPARK_DOMAIN_PACKING_IPv4_HTTPS', 0x40);
+	define('COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX', 0x80);
 
 	define('COINSPARK_DOMAIN_PATH_ENCODE_BASE', 40);
 	define('COINSPARK_DOMAIN_PATH_FALSE_END_CHAR', '<');
@@ -686,7 +688,7 @@
 				self::COINSPARK_GENESIS_QTY_MASK;
 			$chargeFlat=$this->getChargeFlat();
 			$chargeFlatEncoded=$this->chargeFlatExponent*self::COINSPARK_GENESIS_CHARGE_FLAT_EXPONENT_MULTIPLE+$this->chargeFlatMantissa;
-			$domainPathMetadata=$this->encodeDomainAndOrPath($this->domainName, $this->useHttps, $this->pagePath, $this->usePrefix);
+			$domainPathMetadata=$this->encodeDomainAndOrPath($this->domainName, $this->useHttps, $this->pagePath, $this->usePrefix, false);
 			
 			$buffer="COINSPARK GENESIS\n";
 			$buffer.=sprintf("   Quantity mantissa: %d\n", $this->qtyMantissa);
@@ -900,7 +902,7 @@
 			
 		//	Domain name and page path
 		
-			$written=$this->encodeDomainAndOrPath($this->domainName, $this->useHttps, $this->pagePath, $this->usePrefix);
+			$written=$this->encodeDomainAndOrPath($this->domainName, $this->useHttps, $this->pagePath, $this->usePrefix, false);
 			if (!isset($written))
 				return null;
 	
@@ -955,7 +957,7 @@
 		
 		//	Domain name and page path
 			
-			$decodedDomainPath=$this->shiftDecodeDomainAndOrPath($metadata, true, true);
+			$decodedDomainPath=$this->shiftDecodeDomainAndOrPath($metadata, true, true, false);
 			if (!isset($decodedDomainPath))
 				return false;
 				
@@ -2065,7 +2067,7 @@
 		
 		function toString()
 		{
-			$hostPathMetadata=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix);
+			$hostPathMetadata=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix, true);
 			$urlString=$this->calcServerURL();
 			
 			$buffer="COINSPARK MESSAGE\n";
@@ -2171,7 +2173,7 @@
 	
 		//  Server host and path
 			
-			$written=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix);
+			$written=$this->encodeDomainAndOrPath($this->serverHost, $this->useHttps, $this->serverPath, $this->usePrefix, true);
 			if (!isset($written))
 				return null;
 	
@@ -2236,7 +2238,7 @@
 				
 		//  Server host and path
 			
-			$decodedHostPath=$this->shiftDecodeDomainAndOrPath($metadata, true, true);
+			$decodedHostPath=$this->shiftDecodeDomainAndOrPath($metadata, true, true, true);
 			if (!isset($decodedHostPath))
 				return false;
 				
@@ -2341,9 +2343,11 @@
 	
 			$hostPathLen=strlen($this->serverPath)+1;
 	
-			if ($this->readIPv4Address($this->serverHost))
+			if ($this->readIPv4Address($this->serverHost)) {
 				$hashLen-=5; // packing and IP octets
-			else {
+				if ($hostPathLen==1)
+					$hostPathLen=0; // will skip server path in this case
+			} else {
 				$hashLen-=1; // packing
 				$hostPathLen+=strlen($this->shrinkLowerDomainName($this->serverHost, $packing))+1;
 			}
@@ -2750,7 +2754,7 @@
 			return $string;
 		}
 		
-		protected function encodeDomainAndOrPath($domainName, $useHttps, $pagePath, $usePrefix)
+		protected function encodeDomainAndOrPath($domainName, $useHttps, $pagePath, $usePrefix, $forMessages)
 		{
 			$metadata='';
 			$encodeString='';
@@ -2761,8 +2765,21 @@
 				$octets=$this->readIPv4Address($domainName);
 		
 				if (isset($octets)) {
-					$metadata.=chr(COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4+($useHttps ? COINSPARK_DOMAIN_PACKING_IPv4_HTTPS : 0));
-			
+
+					if ($forMessages && ($pagePath==='')) {
+						$packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH;
+						if ($usePrefix)
+							$packing|=COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX;
+					
+						$pagePath=null; // skip encoding the empty page path
+					
+					} else
+						$packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4;
+						
+					if ($useHttps)
+						$packing|=COINSPARK_DOMAIN_PACKING_IPv4_HTTPS;
+					
+					$metadata.=chr($packing);
 					$metadata.=chr($octets[0]);
 					$metadata.=chr($octets[1]);
 					$metadata.=chr($octets[2]);
@@ -2796,7 +2813,7 @@
 			return $metadata;			
 		}
 	
-		protected function shiftDecodeDomainAndOrPath(&$metadata, $doDomainName, $doPagePath)
+		protected function shiftDecodeDomainAndOrPath(&$metadata, $doDomainName, $doPagePath, $forMessages)
 		{
 			$result=array();
 			$metadataParts=0;
@@ -2815,7 +2832,9 @@
 			
 			//	Extract IP address if present
 			 	
-			 	$isIpAddress=(($packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK)==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4);
+				$packingSuffix=$packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK;
+			 	$isIpAddress=($packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4) ||
+		            ($forMessages && ($packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH));
 			 	
 			 	if ($isIpAddress) {
 					$result['useHttps']=($packing&COINSPARK_DOMAIN_PACKING_IPv4_HTTPS) ? true : false;
@@ -2825,6 +2844,12 @@
 						return null;
 				
 					$result['domainName']=sprintf("%u.%u.%u.%u", ord($octetChars[0]), ord($octetChars[1]), ord($octetChars[2]), ord($octetChars[3]));
+					
+					if ($doPagePath && $forMessages && ($packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH)) {
+						$result['pagePath']='';
+						$result['usePrefix']=($packing&COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX) ? true : false;
+						$doPagePath=false; // skip decoding the empty page path
+					}
 
 			 	} else
 			 		$metadataParts++;

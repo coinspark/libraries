@@ -90,9 +90,11 @@ COINSPARK_INTEGER_TO_BASE_58="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqr
 COINSPARK_DOMAIN_PACKING_PREFIX_MASK = 0xC0
 COINSPARK_DOMAIN_PACKING_PREFIX_SHIFT = 6
 COINSPARK_DOMAIN_PACKING_SUFFIX_MASK = 0x3F
-COINSPARK_DOMAIN_PACKING_SUFFIX_MAX = 62
+COINSPARK_DOMAIN_PACKING_SUFFIX_MAX = 61
+COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH = 62
 COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4 = 63
 COINSPARK_DOMAIN_PACKING_IPv4_HTTPS = 0x40
+COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX = 0x80
 
 COINSPARK_DOMAIN_PATH_ENCODE_BASE = 40
 COINSPARK_DOMAIN_PATH_FALSE_END_CHAR = '<'
@@ -308,7 +310,7 @@ class CoinSparkBase:
 
 
 	def isString(self, value):
-		return isinstance(value, str) or isinstance(value, int) or isinstance(value, long) or isinstance(value, float)
+		return isinstance(value, str)
 		
 		
 	def writeSmallEndianUnsigned(self, value, bytes):
@@ -575,7 +577,7 @@ class CoinSparkBase:
 		return {'string':string, 'decodedChars':startLength-len(metadata)}
 
 
-	def encodeDomainAndOrPath(self, domainName, useHttps, pagePath, usePrefix):
+	def encodeDomainAndOrPath(self, domainName, useHttps, pagePath, usePrefix, forMessages):
 		metadata=''
 		encodeString=''
 	
@@ -586,8 +588,22 @@ class CoinSparkBase:
 			octets=self.readIPv4Address(domainName)
 
 			if not octets is None:
+				
+				if forMessages and (pagePath==''):
+					packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH
+					if usePrefix:
+						packing|=COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX
+					
+					pagePath=None # skip encoding the empty page path
+				
+				else:
+					packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4
+					
+				if useHttps:
+					packing|=COINSPARK_DOMAIN_PACKING_IPv4_HTTPS
+				
 				metadata=metadata+(
-					chr(COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4+(COINSPARK_DOMAIN_PACKING_IPv4_HTTPS if useHttps else 0))+
+					chr(packing)+
 					chr(octets[0])+
 					chr(octets[1])+
 					chr(octets[2])+
@@ -608,7 +624,6 @@ class CoinSparkBase:
 			encodeString+=pagePath
 			encodeString+=COINSPARK_DOMAIN_PATH_TRUE_END_CHAR if usePrefix else COINSPARK_DOMAIN_PATH_FALSE_END_CHAR
 
-	
 		# Encode whatever is required as triplets
 
 		if len(encodeString)>0:
@@ -622,7 +637,7 @@ class CoinSparkBase:
 		return metadata			
 
 
-	def decodeDomainAndOrPath(self, metadata, doDomainName, doPagePath):
+	def decodeDomainAndOrPath(self, metadata, doDomainName, doPagePath, forMessages):
 		startLength=len(metadata)
 		result={}
 		metadataParts=0
@@ -639,11 +654,12 @@ class CoinSparkBase:
 				return None
 			
 			packing=ord(packingChar)
-	
 
 			# Extract IP address if present
-		
-			isIpAddress=((packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK)==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4)
+			
+			packingSuffix=packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK
+			isIpAddress=((packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4) or
+				(forMessages and (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH)))
 		
 			if isIpAddress:
 				result['useHttps']=True if (packing&COINSPARK_DOMAIN_PACKING_IPv4_HTTPS) else False
@@ -654,11 +670,15 @@ class CoinSparkBase:
 					return None
 		
 				result['domainName']="%u.%u.%u.%u" % (ord(octetChars[0]), ord(octetChars[1]), ord(octetChars[2]), ord(octetChars[3]))
+				
+				if doPagePath and forMessages and (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH):
+					result['pagePath']=''
+					result['usePrefix']=True if (packing&COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX) else False
+					doPagePath=False # skip decoding the empty page path
 
 			else:
 				metadataParts+=1
 
-	
 		# Convert remaining metadata to string
 
 		if doPagePath:
@@ -1126,7 +1146,7 @@ class CoinSparkGenesis(CoinSparkBase):
 		quantityEncoded=(self.qtyExponent*self.COINSPARK_GENESIS_QTY_EXPONENT_MULTIPLE+self.qtyMantissa)&self.COINSPARK_GENESIS_QTY_MASK
 		chargeFlat=self.getChargeFlat()
 		chargeFlatEncoded=self.chargeFlatExponent*self.COINSPARK_GENESIS_CHARGE_FLAT_EXPONENT_MULTIPLE+self.chargeFlatMantissa
-		domainPathMetadata=self.encodeDomainAndOrPath(self.domainName, self.useHttps, self.pagePath, self.usePrefix)
+		domainPathMetadata=self.encodeDomainAndOrPath(self.domainName, self.useHttps, self.pagePath, self.usePrefix, False)
 		
 		buffer="COINSPARK GENESIS\n"
 		buffer+="   Quantity mantissa: %d\n" % self.qtyMantissa
@@ -1337,7 +1357,7 @@ class CoinSparkGenesis(CoinSparkBase):
 		
 		# Domain name and page path
 	
-		written=self.encodeDomainAndOrPath(self.domainName, self.useHttps, self.pagePath, self.usePrefix)
+		written=self.encodeDomainAndOrPath(self.domainName, self.useHttps, self.pagePath, self.usePrefix, False)
 		if written is None:
 			return None
 
@@ -1393,7 +1413,7 @@ class CoinSparkGenesis(CoinSparkBase):
 	
 		# Domain name and page path
 		
-		decodedDomainPath=self.decodeDomainAndOrPath(metadata, True, True)
+		decodedDomainPath=self.decodeDomainAndOrPath(metadata, True, True, False)
 		if decodedDomainPath is None:
 			return False
 
@@ -2435,7 +2455,7 @@ class CoinSparkMessage(CoinSparkBase):
 	
 	
 	def toString(self):	
-		hostPathMetadata=self.encodeDomainAndOrPath(self.serverHost, self.useHttps, self.serverPath, self.usePrefix)
+		hostPathMetadata=self.encodeDomainAndOrPath(self.serverHost, self.useHttps, self.serverPath, self.usePrefix, True)
 		urlString=self.calcServerURL()
 		
 		buffer="COINSPARK MESSAGE\n"
@@ -2537,7 +2557,7 @@ class CoinSparkMessage(CoinSparkBase):
 
 		# Server host and path
 		
-		written=self.encodeDomainAndOrPath(self.serverHost, self.useHttps, self.serverPath, self.usePrefix)
+		written=self.encodeDomainAndOrPath(self.serverHost, self.useHttps, self.serverPath, self.usePrefix, True)
 		if written is None:
 			return None
 
@@ -2603,7 +2623,7 @@ class CoinSparkMessage(CoinSparkBase):
 			
 		# Server host and path
 		
-		decodedHostPath=self.decodeDomainAndOrPath(metadata, True, True)
+		decodedHostPath=self.decodeDomainAndOrPath(metadata, True, True, True)
 		if decodedHostPath is None:
 			return False
 		
@@ -2709,6 +2729,8 @@ class CoinSparkMessage(CoinSparkBase):
 
 		if self.readIPv4Address(self.serverHost):
 			hashLen-=5 # packing and IP octets
+			if hostPathLen==1:
+				hostPathLen=0 # will skip server path in this case
 		else:
 			hashLen-=1 # packing
 			hostPathLen+=len(self.shrinkLowerDomainName(self.serverHost)['domainName'])+1

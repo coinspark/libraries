@@ -89,9 +89,11 @@ var COINSPARK_INTEGER_TO_BASE_58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijk
 var COINSPARK_DOMAIN_PACKING_PREFIX_MASK = 0xC0;
 var COINSPARK_DOMAIN_PACKING_PREFIX_SHIFT = 6;
 var COINSPARK_DOMAIN_PACKING_SUFFIX_MASK = 0x3F;
-var COINSPARK_DOMAIN_PACKING_SUFFIX_MAX = 62;
+var COINSPARK_DOMAIN_PACKING_SUFFIX_MAX = 61;
+var COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH = 62; // messages only
 var COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4 = 63;
 var COINSPARK_DOMAIN_PACKING_IPv4_HTTPS = 0x40;
+var COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX = 0x80;
 
 var COINSPARK_DOMAIN_PATH_ENCODE_BASE = 40;
 var COINSPARK_DOMAIN_PATH_FALSE_END_CHAR = '<';
@@ -542,7 +544,7 @@ CoinSparkGenesis.prototype.toString=function()
 	var quantityEncoded=(this.qtyExponent*this.COINSPARK_GENESIS_QTY_EXPONENT_MULTIPLE+this.qtyMantissa)&this.COINSPARK_GENESIS_QTY_MASK;
 	var chargeFlat=this.getChargeFlat();
 	var chargeFlatEncoded=this.chargeFlatExponent*this.COINSPARK_GENESIS_CHARGE_FLAT_EXPONENT_MULTIPLE+this.chargeFlatMantissa;
-	var domainPathMetadata=this.encodeDomainAndOrPath(this.domainName, this.useHttps, this.pagePath, this.usePrefix);
+	var domainPathMetadata=this.encodeDomainAndOrPath(this.domainName, this.useHttps, this.pagePath, this.usePrefix, false);
 	
 	var buffer="COINSPARK GENESIS\n";
 	buffer+="   Quantity mantissa: "+this.qtyMantissa+"\n";
@@ -764,7 +766,7 @@ CoinSparkGenesis.prototype.encode=function(metadataMaxLen)
 	
 //	Domain name and page path
 
-	array=this.encodeDomainAndOrPath(this.domainName, this.useHttps, this.pagePath, this.usePrefix);
+	array=this.encodeDomainAndOrPath(this.domainName, this.useHttps, this.pagePath, this.usePrefix, false);
 	if (!array)
 		return null;
 
@@ -819,7 +821,7 @@ CoinSparkGenesis.prototype.decode=function(metadata)
 
 //	Domain name and page path
 	
-	var decodedDomainPath=this.shiftDecodeDomainAndOrPath(metadata, true, true);
+	var decodedDomainPath=this.shiftDecodeDomainAndOrPath(metadata, true, true, false);
 	if (!decodedDomainPath)
 		return false;
 		
@@ -1943,7 +1945,7 @@ CoinSparkMessage.prototype.clear=function()
 
 CoinSparkMessage.prototype.toString=function()
 {
-	var hostPathMetadata=this.encodeDomainAndOrPath(this.serverHost, this.useHttps, this.serverPath, this.usePrefix);
+	var hostPathMetadata=this.encodeDomainAndOrPath(this.serverHost, this.useHttps, this.serverPath, this.usePrefix, true);
 	var urlString=this.calcServerURL();
 	
 	var buffer="COINSPARK MESSAGE\n";
@@ -2051,7 +2053,7 @@ CoinSparkMessage.prototype.encode=function(countOutputs, metadataMaxLen)
 
 //  Server host and path
 	
-	var array=this.encodeDomainAndOrPath(this.serverHost, this.useHttps, this.serverPath, this.usePrefix);
+	var array=this.encodeDomainAndOrPath(this.serverHost, this.useHttps, this.serverPath, this.usePrefix, true);
 	if (!array)
 		return null;
 
@@ -2120,7 +2122,7 @@ CoinSparkMessage.prototype.decode=function(metadata, countOutputs)
 		
 //  Server host and path
 	
-	var decodedHostPath=this.shiftDecodeDomainAndOrPath(metadata, true, true);
+	var decodedHostPath=this.shiftDecodeDomainAndOrPath(metadata, true, true, true);
 	if (!decodedHostPath)
 		return false;
 		
@@ -2230,9 +2232,11 @@ CoinSparkMessage.prototype.calcHashLen=function(countOutputs, metadataMaxLen)
 
 	var hostPathLen=this.serverPath.length+1;
 
-	if (this.readIPv4Address(this.serverHost))
+	if (this.readIPv4Address(this.serverHost)) {
 		hashLen-=5; // packing and IP octets
-	else {
+		if (hostPathLen==1)
+			hostPathLen=0; // will skip server path in this case
+	} else {
 		hashLen-=1; // packing
 		hostPathLen+=this.shrinkLowerDomainName(this.serverHost).domainName.length+1;
 	}
@@ -2660,7 +2664,7 @@ CoinSparkBase.prototype.shiftDecodeDomainPathTriplets=function(metadata, parts)
 	return string;
 }
 
-CoinSparkBase.prototype.encodeDomainAndOrPath=function(domainName, useHttps, pagePath, usePrefix)
+CoinSparkBase.prototype.encodeDomainAndOrPath=function(domainName, useHttps, pagePath, usePrefix, forMessages)
 {
 	var metadata=[];
 	var encodeString='';
@@ -2671,8 +2675,22 @@ CoinSparkBase.prototype.encodeDomainAndOrPath=function(domainName, useHttps, pag
 		var octets=this.readIPv4Address(domainName);
 
 		if (octets!=null) {
+			
+			if (forMessages && (pagePath==='')) {
+				var packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH;
+				if (usePrefix)
+					packing|=COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX;
+					
+				pagePath=null; // skip encoding the empty page path
+			
+			} else
+				var packing=COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4;
+				
+			if (useHttps)
+				packing|=COINSPARK_DOMAIN_PACKING_IPv4_HTTPS;
+			
 			metadata=metadata.concat([
-				COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4+(useHttps ? COINSPARK_DOMAIN_PACKING_IPv4_HTTPS : 0),
+				packing,
 				parseInt(octets[0], 10),
 				parseInt(octets[1], 10),
 				parseInt(octets[2], 10),
@@ -2708,7 +2726,7 @@ CoinSparkBase.prototype.encodeDomainAndOrPath=function(domainName, useHttps, pag
 	return metadata;			
 }
 
-CoinSparkBase.prototype.shiftDecodeDomainAndOrPath=function(metadata, doDomainName, doPagePath)
+CoinSparkBase.prototype.shiftDecodeDomainAndOrPath=function(metadata, doDomainName, doPagePath, forMessages)
 {
 	var result=[];
 	var metadataParts=0;
@@ -2725,7 +2743,9 @@ CoinSparkBase.prototype.shiftDecodeDomainAndOrPath=function(metadata, doDomainNa
 	
 	//	Extract IP address if present
 		
-		var isIpAddress=((packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK)==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4);
+		var packingSuffix=packing&COINSPARK_DOMAIN_PACKING_SUFFIX_MASK;
+		var isIpAddress=(packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4) ||
+			(forMessages && (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH));
 		
 		if (isIpAddress) {
 			result['useHttps']=(packing&COINSPARK_DOMAIN_PACKING_IPv4_HTTPS) ? true : false;
@@ -2735,6 +2755,12 @@ CoinSparkBase.prototype.shiftDecodeDomainAndOrPath=function(metadata, doDomainNa
 				return null;
 		
 			result['domainName']=octets[0]+'.'+octets[1]+'.'+octets[2]+'.'+octets[3];
+			
+			if (doPagePath && forMessages && (packingSuffix==COINSPARK_DOMAIN_PACKING_SUFFIX_IPv4_NO_PATH)) {
+				result['pagePath']='';
+				result['usePrefix']=(packing&COINSPARK_DOMAIN_PACKING_IPv4_NO_PATH_PREFIX) ? true : false;
+				doPagePath=false; // skip decoding the empty page path
+			}
 
 		} else
 			metadataParts++;
