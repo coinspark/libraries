@@ -120,6 +120,15 @@ the arrow button at the top. Once Javascript has finished executing, the content
 in the right-hand side of the page can be compared against the appropriate
 '...-Output-C.txt' file, and should be identical.
 
+* Cleaning up after the tests
+
+cd ..
+rm -r CoinSpark-Tests-*
+rm c/coinspark-test
+rm python/coinspark.pyc
+rm java/src/main/java/org/coinspark/protocol/*.class
+
+
 
 LICENSE (MIT)
 -------------
@@ -147,6 +156,9 @@ THE SOFTWARE.
 
 CHANGELOG
 ---------
+
+v2.0.4 - 23 January 2015
+- More efficient encoding for IPv4 message servers with no path
 
 v2.0.3 - 14 January 2015
 - Support bytearray for scripts in Python script<->metadata functions
