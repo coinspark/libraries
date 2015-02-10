@@ -174,7 +174,9 @@ THE SOFTWARE.
 CHANGELOG
 ---------
 
-v2.1 - 
+v2.1 - 10 February 2015
+- Added complete Ruby (2.x) library
+- Removed case insensitivity when checking binary hash matches in PHP, Python
 
 v2.0.4 - 23 January 2015
 - More efficient encoding for IPv4 message servers with no path
