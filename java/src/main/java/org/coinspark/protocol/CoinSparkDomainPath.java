@@ -1,5 +1,5 @@
 /*
- * CoinSpark 2.0 - Java library
+ * CoinSpark 2.1 - Java library
  *
  * Copyright (c) Coin Sciences Ltd
  * 

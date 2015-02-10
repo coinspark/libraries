@@ -1,5 +1,5 @@
 /*
- * CoinSpark 2.0 - Java test suite
+ * CoinSpark 2.1 - Java test suite
  *
  * Copyright (c) Coin Sciences Ltd
  * 

@@ -1,7 +1,7 @@
 <?php
 
 /*
- * CoinSpark 2.0 - PHP library
+ * CoinSpark 2.1 - PHP library
  *
  * Copyright (c) Coin Sciences Ltd
  * 
@@ -779,7 +779,7 @@
 				(!strcasecmp($this->domainName, $otherGenesis->domainName)) &&
 				($this->usePrefix==$otherGenesis->usePrefix) &&
 				(!strcasecmp($this->pagePath, $otherGenesis->pagePath)) &&
-				(!strncasecmp($this->assetHash, $otherGenesis->assetHash, $hashCompareLen));
+				(!strncmp($this->assetHash, $otherGenesis->assetHash, $hashCompareLen));
 		}
 
 		function getQty()
@@ -2159,7 +2159,7 @@
 				($this->usePrefix==$otherMessage->usePrefix) &&
 				(!strcasecmp($this->serverPath, $otherMessage->serverPath)) &&
 				($this->isPublic==$otherMessage->isPublic) &&
-				(!strncasecmp($this->hash, $otherMessage->hash, $hashCompareLen));
+				(!strncmp($this->hash, $otherMessage->hash, $hashCompareLen));
 		}
 		
 		function encode($countOutputs, $metadataMaxLen)

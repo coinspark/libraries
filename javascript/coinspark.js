@@ -1,5 +1,5 @@
 /*
- * CoinSpark 2.0 - Javascript library
+ * CoinSpark 2.1 - Javascript library
  *
  * Copyright (c) Coin Sciences Ltd
  * 
