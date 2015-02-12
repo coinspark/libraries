@@ -1886,7 +1886,7 @@ class CoinSparkTransfer < CoinSparkBase
 		
 		txIDPrefixBytes=counts['txIDPrefixBytes']
 		
-		metadataArray=metadata.chars # split into array of characters for next bit
+		metadataArray=metadata.chars.to_a # split into array of characters for next bit (.to_a for Ruby 1.9)
 		
 		read_array=[
 			shiftReadUnsignedField(metadataArray, counts['blockNumBytes'], @assetRef, '@blockNum'),
@@ -2738,7 +2738,7 @@ class CoinSparkMessage < CoinSparkBase
 		
 				# The index of the first output and number of outputs, if necessary
 				
-				metadataArray=metadata.chars # split into array of characters for next bit
+				metadataArray=metadata.chars.to_a # split into array of characters for next bit (.to_a for Ruby 1.9)
 				
 				return false if !shiftReadUnsignedField(metadataArray, firstBytes, outputRange, '@first')
 				return false if !shiftReadUnsignedField(metadataArray, countBytes, outputRange, '@count')

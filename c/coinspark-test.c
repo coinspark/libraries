@@ -30,7 +30,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "coinspark.h"
-#include <openssl/sha.h>
 #include <ctype.h>
 
 #define MAX_OP_RETURN_LEN 40

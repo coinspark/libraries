@@ -12,8 +12,8 @@ The libraries are available in 6 languages:
 * Java
 * Javascript
 * PHP (5+)
-* Python (2.5+, 3+)
-* Ruby (2+)
+* Python (2.5+)
+* Ruby (1.9+)
 
 The libraries for each language are functionally identical, and use as similar
 calling conventions as possible, given the constraints imposed by each language. 
