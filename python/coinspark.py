@@ -1,4 +1,4 @@
-# CoinSpark 2.0 - Python library
+# CoinSpark 2.1 - Python library
 #
 # Copyright (c) Coin Sciences Ltd
 # 
@@ -394,7 +394,7 @@ class CoinSparkBase:
 		if len(outputsSatoshis)==len(outputsRegular): # if arrays different size, we can't use them
 			for outputIndex in range(len(outputsSatoshis)):
 				if outputsRegular[outputIndex]:
-					smallestOutputSatoshis=min(smallestOutputSatoshis, float(outputsSatoshis[outputIndex]))
+					smallestOutputSatoshis=min(smallestOutputSatoshis, int(outputsSatoshis[outputIndex]))
 
 		return min(COINSPARK_FEE_BASIS_MAX_SATOSHIS, smallestOutputSatoshis)
 
@@ -413,7 +413,7 @@ class CoinSparkBase:
 		countRegularOutputs=0
 		
 		for outputRegular in outputsRegular:
-			if (outputRegular):
+			if outputRegular:
 				countRegularOutputs+=1
 				
 		return max(countRegularOutputs-1, 0)
@@ -424,7 +424,6 @@ class CoinSparkBase:
 			return None
 	
 		domainName=domainName.lower()
-
 
 		# Search for prefixes
 
@@ -438,10 +437,8 @@ class CoinSparkBase:
 				bestPrefixIndex=prefixIndex
 				bestPrefixLen=prefixLen
 
-
 		domainName=domainName[bestPrefixLen:]
 		domainNameLen=len(domainName)
-
 
 		# Search for suffixes
 
@@ -455,9 +452,7 @@ class CoinSparkBase:
 				bestSuffixIndex=suffixIndex
 				bestSuffixLen=suffixLen
 
-
 		domainName=domainName[:domainNameLen-bestSuffixLen]
-
 		
 		# Output and return
 
@@ -553,7 +548,6 @@ class CoinSparkBase:
 				if stringTriplet>=(COINSPARK_DOMAIN_PATH_ENCODE_BASE*COINSPARK_DOMAIN_PATH_ENCODE_BASE*COINSPARK_DOMAIN_PATH_ENCODE_BASE):
 					return None # invalid value
 
-
 			stringPosMod3=stringPos%3
 			
 			if stringPosMod3==0:
@@ -565,14 +559,12 @@ class CoinSparkBase:
 			elif stringPosMod3==2:
 				decodeValue=math.floor(stringTriplet/(COINSPARK_DOMAIN_PATH_ENCODE_BASE*COINSPARK_DOMAIN_PATH_ENCODE_BASE))
 
-
 			decodeChar=COINSPARK_DOMAIN_NAME_CHARS[int(decodeValue)]
 			string=string+decodeChar
 			stringPos+=1
 
 			if (decodeChar==COINSPARK_DOMAIN_PATH_TRUE_END_CHAR) or (decodeChar==COINSPARK_DOMAIN_PATH_FALSE_END_CHAR):
 				parts-=1
-
 
 		return {'string':string, 'decodedChars':startLength-len(metadata)}
 
@@ -581,7 +573,6 @@ class CoinSparkBase:
 		metadata=''
 		encodeString=''
 	
-
 		# Domain name
 
 		if not domainName is None:
@@ -602,7 +593,7 @@ class CoinSparkBase:
 				if useHttps:
 					packing|=COINSPARK_DOMAIN_PACKING_IPv4_HTTPS
 				
-				metadata=metadata+(
+				metadata+=(
 					chr(packing)+
 					chr(octets[0])+
 					chr(octets[1])+
@@ -633,7 +624,6 @@ class CoinSparkBase:
 				
 			metadata+=written
 
-	
 		return metadata			
 
 
@@ -691,7 +681,6 @@ class CoinSparkBase:
 			metadata=metadata[decodeResult['decodedChars']:]
 			decodeString=decodeResult['string']
 
-
 			# Extract domain name if IP address was not present
 		
 			if doDomainName and not isIpAddress:
@@ -710,7 +699,6 @@ class CoinSparkBase:
 				result['useHttps']=(decodeString[endCharPos]==COINSPARK_DOMAIN_PATH_TRUE_END_CHAR)
 
 				decodeString=decodeString[endCharPos+1:]
-
 
 			# Extract page path
 
@@ -836,7 +824,7 @@ class CoinSparkBase:
 
 	def packingExtendAddByteCounts(self, packingExtend, firstBytes, countBytes, forMessages):
 		if packingExtend==self.COINSPARK_PACKING_EXTEND_0_1_BYTE:
-			if (forMessages): # otherwise it's really COINSPARK_PACKING_EXTEND_1S
+			if forMessages: # otherwise it's really COINSPARK_PACKING_EXTEND_1S
 				countBytes=1
 		
 		elif packingExtend==self.COINSPARK_PACKING_EXTEND_1_0_BYTE:
@@ -889,7 +877,7 @@ class CoinSparkBase:
 	
 		for (packingType, packingExtendTest) in packingExtendMap:
 			if packingExtend==packingExtendTest:
-				if (packingType!=('_1S' if forMessages else '_0_1_BYTE')): # no _1S for messages, no _0_1_BYTE for transfers
+				if packingType!=('_1S' if forMessages else '_0_1_BYTE'): # no _1S for messages, no _0_1_BYTE for transfers
 					return packingType
 			
 		return None
@@ -1059,7 +1047,6 @@ class CoinSparkAddress(CoinSparkBase):
 		halfLength=int(math.ceil(stringLen/2.0))
 		for charIndex in range(1, halfLength): # exclude first character
 			stringBase58[charIndex]=(stringBase58[charIndex]+58-stringBase58[stringLen-charIndex])%58
-			
 	
 		# Get length of extra data
 	
@@ -1073,7 +1060,6 @@ class CoinSparkAddress(CoinSparkBase):
 			
 		bitcoinAddressLen=stringLen-2-extraDataChars
 		
-		
 		# Read the extra data for address flags
 	
 		self.addressFlags=0
@@ -1083,7 +1069,6 @@ class CoinSparkAddress(CoinSparkBase):
 			self.addressFlags+=charValue*multiplier
 			multiplier*=58
 			
-	
 		# Read the extra data for payment reference
 	
 		self.paymentRef.ref=0
@@ -1092,7 +1077,6 @@ class CoinSparkAddress(CoinSparkBase):
 		for charValue in stringBase58[2+addressFlagChars:2+extraDataChars]:
 			self.paymentRef.ref+=charValue*multiplier
 			multiplier*=58
-			
 			
 		# Convert the bitcoin address
 		
@@ -1106,7 +1090,6 @@ class CoinSparkAddress(CoinSparkBase):
 				charValue-=stringBase58[2+charIndex%extraDataChars]
 				
 			self.bitcoinAddress+=COINSPARK_INTEGER_TO_BASE_58[charValue%58]
-		
 		
 		return self.isValid()
 		
@@ -1239,7 +1222,7 @@ class CoinSparkGenesis(CoinSparkBase):
 			(self.domainName.lower()==otherGenesis.domainName.lower()) and
 			(self.usePrefix==otherGenesis.usePrefix) and
 			(self.pagePath.lower()==otherGenesis.pagePath.lower()) and
-			(self.assetHash[:hashCompareLen].lower()==otherGenesis.assetHash[:hashCompareLen].lower())
+			(self.assetHash[:hashCompareLen]==otherGenesis.assetHash[:hashCompareLen])
 		)
 
 	
@@ -1473,7 +1456,6 @@ class CoinSparkGenesis(CoinSparkBase):
 		).lower()
 
 	
-
 # CoinSparkAssetRef class for managing asset references
 
 class CoinSparkAssetRef(CoinSparkBase):
@@ -1485,7 +1467,7 @@ class CoinSparkAssetRef(CoinSparkBase):
 	def clear(self):
 		self.blockNum=0
 		self.txOffset=0
-		self.txIDPrefix='00' * COINSPARK_ASSETREF_TXID_PREFIX_LEN
+		self.txIDPrefix='00'*COINSPARK_ASSETREF_TXID_PREFIX_LEN
 
 		
 	def toString(self):
@@ -1746,12 +1728,12 @@ class CoinSparkTransfer(CoinSparkBase):
 		metadata=chr(packing)
 	
 		if (packing & self.COINSPARK_PACKING_INDICES_MASK) == self.COINSPARK_PACKING_INDICES_EXTEND:
-			metadata=metadata+chr(packingExtend)
+			metadata+=chr(packingExtend)
 	
 		written_array=[
 			self.writeUnsignedField(counts['blockNumBytes'], self.assetRef.blockNum),
 			self.writeUnsignedField(counts['txOffsetBytes'], self.assetRef.txOffset),
-			(CoinSparkHexToRawString(self.assetRef.txIDPrefix)+("\x00" * counts['txIDPrefixBytes']))[:counts['txIDPrefixBytes']], # ensure right length
+			(CoinSparkHexToRawString(self.assetRef.txIDPrefix)+("\x00"*counts['txIDPrefixBytes']))[:counts['txIDPrefixBytes']], # ensure right length
 			self.writeUnsignedField(counts['firstInputBytes'], self.inputs.first),
 			self.writeUnsignedField(counts['countInputsBytes'], self.inputs.count),
 			self.writeUnsignedField(counts['firstOutputBytes'], self.outputs.first),
@@ -1762,8 +1744,8 @@ class CoinSparkTransfer(CoinSparkBase):
 		for written in written_array:
 			if written is None:
 				return None
-			else:
-				metadata+=written
+			
+			metadata+=written
 			
 		# Check the total length is within the specified limit
 
@@ -1772,7 +1754,7 @@ class CoinSparkTransfer(CoinSparkBase):
 		
 		# Return what we created
 
-		return metadata			
+		return metadata
 
 
 	def decode(self, metadata, previousTransfer, countInputs, countOutputs):
@@ -1796,8 +1778,7 @@ class CoinSparkTransfer(CoinSparkBase):
 			else: # it's for a default route
 				self.assetRef.blockNum=COINSPARK_TRANSFER_BLOCK_NUM_DEFAULT_ROUTE
 				self.assetRef.txOffset=0
-				self.assetRef.txIDPrefix="00" * COINSPARK_ASSETREF_TXID_PREFIX_LEN
-
+				self.assetRef.txIDPrefix="00"*COINSPARK_ASSETREF_TXID_PREFIX_LEN
 
 		# Packing for input and output indices
 
@@ -1857,7 +1838,6 @@ class CoinSparkTransfer(CoinSparkBase):
 			):
 				outputPackingType='_ALL'
 			
-
 		# Final stage of packing for input and output indices
 
 		self.inputs=self.packingTypeToValues(inputPackingType, previousTransfer.inputs if previousTransfer else None, countInputs)
@@ -2165,7 +2145,6 @@ class CoinSparkTransferList(CoinSparkBase):
 			else:
 				return 0 # something was invalid
 
-
 		# Return count
 
 		return len(self.transfers)
@@ -2202,7 +2181,7 @@ class CoinSparkTransferList(CoinSparkBase):
 	
 		countInputs=len(inputBalances)
 		countOutputs=len(outputsRegular)
-		outputBalances=[0] * countOutputs
+		outputBalances=[0]*countOutputs
 	
 		# Perform explicit transfers (i.e. not default routes)
 		
@@ -2256,7 +2235,7 @@ class CoinSparkTransferList(CoinSparkBase):
 
 	def applyNone(self, assetRef, genesis, inputBalances, outputsRegular):
 		countOutputs=len(outputsRegular)
-		outputBalances=[0] * countOutputs
+		outputBalances=[0]*countOutputs
 
 		outputIndex=self.getLastRegularOutput(outputsRegular)
 		if not outputIndex is None:
@@ -2267,7 +2246,7 @@ class CoinSparkTransferList(CoinSparkBase):
 
 	
 	def defaultOutputs(self, countInputs, outputsRegular):
-		outputsDefault=[False] * len(outputsRegular)
+		outputsDefault=[False]*len(outputsRegular)
 	
 		inputDefaultOutput=self.getDefaultRouteMap(countInputs, outputsRegular)
 		
@@ -2280,8 +2259,8 @@ class CoinSparkTransferList(CoinSparkBase):
 
 	def groupOrdering(self):
 		countTransfers=len(self.transfers)
-		transferUsed=[False] * countTransfers
-		ordering=[None] * countTransfers
+		transferUsed=[False]*countTransfers
+		ordering=[None]*countTransfers
 
 		for orderIndex in range(countTransfers):
 			bestTransferScore=0
@@ -2317,7 +2296,7 @@ class CoinSparkTransferList(CoinSparkBase):
 	
 		# Default to last output for all inputs
 
-		inputDefaultOutput=[self.getLastRegularOutput(outputsRegular)] * countInputs
+		inputDefaultOutput=[self.getLastRegularOutput(outputsRegular)]*countInputs
 	
 		# Apply any default route transfers in reverse order (since early ones take precedence)
 		
@@ -2392,11 +2371,11 @@ class CoinSparkPaymentRef(CoinSparkBase):
 	
 		bytes=0
 		paymentLeft=self.ref
-		while (paymentLeft>0):
+		while paymentLeft>0:
 			bytes+=1
 			paymentLeft=math.floor(paymentLeft/256)
 		
-		metadata=metadata+self.writeSmallEndianUnsigned(self.ref, bytes)
+		metadata+=self.writeSmallEndianUnsigned(self.ref, bytes)
 	
 		# Check the total length is within the specified limit
 
@@ -2423,7 +2402,7 @@ class CoinSparkPaymentRef(CoinSparkBase):
 		
 		# Return validity
 
-		return self.isValid()	
+		return self.isValid()
 
 
 # CoinSparkMessage class for managing message metadata
@@ -2549,7 +2528,7 @@ class CoinSparkMessage(CoinSparkBase):
 	
 	def encode(self, countOutputs, metadataMaxLen):
 		if not self.isValid():
-			return None;
+			return None
 
 		# 4-character identifier
 	
@@ -2566,7 +2545,7 @@ class CoinSparkMessage(CoinSparkBase):
 		# Output ranges
 
 		if self.isPublic: # add public indicator first
-			packing=((self.COINSPARK_OUTPUTS_MORE_FLAG if len(self.outputRanges)>0 else 0) |
+			packing=((self.COINSPARK_OUTPUTS_MORE_FLAG if (len(self.outputRanges)>0) else 0) |
 				self.COINSPARK_OUTPUTS_TYPE_EXTEND | self.COINSPARK_PACKING_EXTEND_PUBLIC)
 			metadata+=chr(packing)
 		

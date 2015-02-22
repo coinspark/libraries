@@ -6,13 +6,14 @@ ABOUT
 The CoinSpark libraries help you integrate support for the CoinSpark protocol into
 your wallet, or any other tool or service.
 
-The libraries are available in 5 languages:
+The libraries are available in 6 languages:
 
 * C/C++
 * Java
 * Javascript
 * PHP (5+)
-* Python (2.5+, 3+)
+* Python (2.5+)
+* Ruby (1.9+)
 
 The libraries for each language are functionally identical, and use as similar
 calling conventions as possible, given the constraints imposed by each language. 
@@ -71,7 +72,7 @@ diff MessageHash-Output-C.txt MessageHash-Output-PHP.txt
 
 * Feel free to look inside the input and output files to see what is going on.
 
-* Python tests run similarly to PHP. First, create Python outputs:
+* Python and Ruby tests run similarly to PHP. First, create Python and Ruby outputs:
 
 python ../python/coinspark-test.py Address-Input.txt > Address-Output-Python.txt
 python ../python/coinspark-test.py AssetRef-Input.txt > AssetRef-Output-Python.txt
@@ -81,7 +82,15 @@ python ../python/coinspark-test.py Genesis-Input.txt > Genesis-Output-Python.txt
 python ../python/coinspark-test.py Transfer-Input.txt > Transfer-Output-Python.txt
 python ../python/coinspark-test.py MessageHash-Input.txt > MessageHash-Output-Python.txt
 
-* Now check the corresponding Python and C output files for differencess
+ruby ../ruby/coinspark-test.rb Address-Input.txt > Address-Output-Ruby.txt
+ruby ../ruby/coinspark-test.rb AssetRef-Input.txt > AssetRef-Output-Ruby.txt
+ruby ../ruby/coinspark-test.rb Script-Input.txt > Script-Output-Ruby.txt
+ruby ../ruby/coinspark-test.rb AssetHash-Input.txt > AssetHash-Output-Ruby.txt
+ruby ../ruby/coinspark-test.rb Genesis-Input.txt > Genesis-Output-Ruby.txt
+ruby ../ruby/coinspark-test.rb Transfer-Input.txt > Transfer-Output-Ruby.txt
+ruby ../ruby/coinspark-test.rb MessageHash-Input.txt > MessageHash-Output-Ruby.txt
+
+* Now check the corresponding Python/Ruby and C output files for differencess
 
 diff Address-Output-C.txt Address-Output-Python.txt
 diff AssetRef-Output-C.txt AssetRef-Output-Python.txt
@@ -91,7 +100,15 @@ diff Genesis-Output-C.txt Genesis-Output-Python.txt
 diff Transfer-Output-C.txt Transfer-Output-Python.txt
 diff MessageHash-Output-C.txt MessageHash-Output-Python.txt
 
-* If no differences were reported, the library has passed the C-Python consistency test.
+diff Address-Output-C.txt Address-Output-Ruby.txt
+diff AssetRef-Output-C.txt AssetRef-Output-Ruby.txt
+diff Script-Output-C.txt Script-Output-Ruby.txt
+diff AssetHash-Output-C.txt AssetHash-Output-Ruby.txt
+diff Genesis-Output-C.txt Genesis-Output-Ruby.txt
+diff Transfer-Output-C.txt Transfer-Output-Ruby.txt
+diff MessageHash-Output-C.txt MessageHash-Output-Ruby.txt
+
+* If no differences were reported, we've passed the C-Python and C-Ruby consistency tests.
 
 * Java tests begin by compiling the Java classes:
 
@@ -156,6 +173,10 @@ THE SOFTWARE.
 
 CHANGELOG
 ---------
+
+v2.1 - 10 February 2015
+- Added complete Ruby (1.9+) library
+- Removed case insensitivity when checking binary hash matches in PHP, Python
 
 v2.0.4 - 23 January 2015
 - More efficient encoding for IPv4 message servers with no path

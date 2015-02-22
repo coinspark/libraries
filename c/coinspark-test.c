@@ -1,5 +1,5 @@
 /*
- * CoinSpark 2.0 - C test suite
+ * CoinSpark 2.1 - C test suite
  *
  * Copyright (c) Coin Sciences Ltd
  * 
@@ -30,7 +30,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "coinspark.h"
-#include <openssl/sha.h>
 #include <ctype.h>
 
 #define MAX_OP_RETURN_LEN 40

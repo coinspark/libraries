@@ -1,7 +1,7 @@
 <?php
 
 /*
- * CoinSpark 2.0 - PHP test suite
+ * CoinSpark 2.1 - PHP test suite
  *
  * Copyright (c) Coin Sciences Ltd
  * 
