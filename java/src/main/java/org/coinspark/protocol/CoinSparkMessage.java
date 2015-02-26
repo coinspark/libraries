@@ -175,7 +175,11 @@ public class CoinSparkMessage extends CoinSparkBase{
      */
     
     public void setHash(byte [] Hash) {
-        hash=Arrays.copyOf(Hash, Hash.length);
+	if (Hash==null) {
+	    hash=null;
+	} else {
+	    hash=Arrays.copyOf(Hash, Hash.length);
+	}
     }
     
     /**
@@ -494,6 +498,11 @@ public class CoinSparkMessage extends CoinSparkBase{
         
         for(CoinSparkMessagePart part : messageParts)
         {
+	    // Avoid null pointer exception when accessing length attribute later
+	    if (part.content==null) {
+		return null;
+	    }
+	    
             bufferSize += (part.mimeType != null) ? part.mimeType.getBytes().length : 0;
             bufferSize += (part.fileName != null) ? part.fileName.getBytes().length : 0;
             bufferSize+=part.content.length;
