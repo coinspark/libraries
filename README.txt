@@ -30,7 +30,7 @@ for Unix-based systems.
 
 * Download all the library files to your computer.
 
-* In your Terminal, navigate to the directory containing those files,
+* In your Terminal, navigate to the directory containing those files.
 
 * Compile the C library tests:
 
