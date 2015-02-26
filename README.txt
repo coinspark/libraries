@@ -23,14 +23,14 @@ For more information and code examples: http://coinspark.org/developers/
 
 HOW TO TEST
 -----------
-The libraries include extensive tests to verify that it behaves identically for
+The libraries include extensive tests to verify that they behave identically for
 all inputs, for all languages. We encourage you to run these tests for yourself
 by following the steps below. Explicit command line instructions are provided
 for Unix-based systems.
 
 * Download all the library files to your computer.
 
-* In your Terminal, navigate to the directory containing those files
+* In your Terminal, navigate to the directory containing those files,
 
 * Compile the C library tests:
 
@@ -44,7 +44,7 @@ c/coinspark-test
 
 * If no error is shown, the library has passed all internal C tests.
 
-* Navigate to the directory containing the test files
+* Navigate to the directory containing the test files:
 
 cd CoinSpark-Tests-*
 
@@ -58,7 +58,7 @@ php ../php/coinspark-test.php Genesis-Input.txt > Genesis-Output-PHP.txt
 php ../php/coinspark-test.php Transfer-Input.txt > Transfer-Output-PHP.txt
 php ../php/coinspark-test.php MessageHash-Input.txt > MessageHash-Output-PHP.txt
 
-* Now check the corresponding PHP and C output files for differences
+* Now check the corresponding PHP and C output files for differences:
 
 diff Address-Output-C.txt Address-Output-PHP.txt
 diff AssetRef-Output-C.txt AssetRef-Output-PHP.txt
@@ -90,7 +90,7 @@ ruby ../ruby/coinspark-test.rb Genesis-Input.txt > Genesis-Output-Ruby.txt
 ruby ../ruby/coinspark-test.rb Transfer-Input.txt > Transfer-Output-Ruby.txt
 ruby ../ruby/coinspark-test.rb MessageHash-Input.txt > MessageHash-Output-Ruby.txt
 
-* Now check the corresponding Python/Ruby and C output files for differencess
+* Now check the corresponding Python/Ruby and C output files for differences:
 
 diff Address-Output-C.txt Address-Output-Python.txt
 diff AssetRef-Output-C.txt AssetRef-Output-Python.txt
@@ -118,7 +118,7 @@ javac ../java/src/main/java/org/coinspark/protocol/*.java
 
 java -classpath ../java/src/main/java/ org.coinspark.protocol.CoinSparkTest
 
-* Now check the corresponding Java and C output files for differencess
+* Now check the corresponding Java and C output files for differences:
 
 diff Address-Output-C.txt Address-Output-Java.txt
 diff AssetRef-Output-C.txt AssetRef-Output-Java.txt
@@ -137,7 +137,7 @@ the arrow button at the top. Once Javascript has finished executing, the content
 in the right-hand side of the page can be compared against the appropriate
 '...-Output-C.txt' file, and should be identical.
 
-* Cleaning up after the tests
+* Cleaning up after the tests:
 
 cd ..
 rm -r CoinSpark-Tests-*
